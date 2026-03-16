@@ -1,4 +1,4 @@
-# Opex Enterprise Dashboard
+# RegTech365 Enterprise Dashboard
 
 A modern, high-performance enterprise dashboard built with [NiceGUI](https://nicegui.io/), Python, and MongoDB. This platform integrates with Google Cloud services to provide comprehensive analytics, project tracking, and AI-driven insights.
 
