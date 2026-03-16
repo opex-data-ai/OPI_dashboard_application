@@ -470,20 +470,66 @@ def get_user_by_email(email):
     return None
 
 
-# Gmail service (unchanged)
+# Gmail service - supports both local (token.pickle) and Render (GMAIL_TOKEN_BASE64 env var)
 def get_gmail_service():
+    """
+    Load Gmail OAuth credentials.
+    - Local: reads/writes token.pickle file.
+    - Render: reads/writes GMAIL_TOKEN_BASE64 env var (base64-encoded pickle).
+    After a token refresh the new base64 value is logged so you can update
+    the Render env var without another local run.
+    """
+    import base64
+    
     creds = None
-    if os.path.exists('token.pickle'):
+    token_b64 = os.getenv('GMAIL_TOKEN_BASE64')
+
+    # 1. Try loading from env var (Render)
+    if token_b64:
+        try:
+            creds = pickle.loads(base64.b64decode(token_b64))
+            logger.info("Gmail token loaded from GMAIL_TOKEN_BASE64 env var")
+        except Exception as e:
+            logger.warning(f"Failed to decode GMAIL_TOKEN_BASE64: {e}")
+            creds = None
+
+    # 2. Fallback: try loading from file (local dev)
+    if creds is None and os.path.exists('token.pickle'):
         with open('token.pickle', 'rb') as token:
             creds = pickle.load(token)
+        logger.info("Gmail token loaded from token.pickle")
+
+    # 3. Refresh or re-authenticate if needed
     if not creds or not creds.valid:
         if creds and creds.expired and creds.refresh_token:
             creds.refresh(Request())
+            logger.info("Gmail token refreshed")
+
+            # Persist refreshed token
+            refreshed_b64 = base64.b64encode(pickle.dumps(creds)).decode()
+            if token_b64:
+                # On Render: log new value so dev can update the env var
+                logger.warning(
+                    "Gmail token refreshed. Update GMAIL_TOKEN_BASE64 on Render with the new value:\n"
+                    f"{refreshed_b64}"
+                )
+            else:
+                # Locally: save back to file
+                with open('token.pickle', 'wb') as token:
+                    pickle.dump(creds, token)
         else:
+            # Interactive auth — only possible locally
+            if os.getenv('RENDER'):
+                logger.error(
+                    "Gmail token is missing or expired on Render and cannot be refreshed interactively. "
+                    "Run locally to generate a fresh token.pickle, then set GMAIL_TOKEN_BASE64."
+                )
+                raise RuntimeError("Gmail credentials unavailable on Render. Re-authenticate locally.")
             flow = InstalledAppFlow.from_client_secrets_file(CREDENTIALS_FILE, SCOPES)
             creds = flow.run_local_server(port=0)
-        with open('token.pickle', 'wb') as token:
-            pickle.dump(creds, token)
+            with open('token.pickle', 'wb') as token:
+                pickle.dump(creds, token)
+
     return build('gmail', 'v1', credentials=creds)
 
 

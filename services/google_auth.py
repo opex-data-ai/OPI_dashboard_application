@@ -1,4 +1,5 @@
 import os
+import logging
 from google_auth_oauthlib.flow import Flow
 from google.auth.transport.requests import Request
 import google.auth.transport.requests
@@ -6,6 +7,8 @@ from dotenv import load_dotenv
 
 # Load environment variables
 load_dotenv()
+
+logger = logging.getLogger(__name__)
 
 # Google OAuth Configuration
 GOOGLE_CLIENT_ID = os.getenv('GOOGLE_CLIENT_ID', 'your-client-id.apps.googleusercontent.com')
@@ -18,16 +21,35 @@ SCOPES = [
     'https://www.googleapis.com/auth/userinfo.profile'
 ]
 
-# Redirect URI (update for production)
+# Redirect URI - supports both local dev and Render deployment
+# On Render: set GOOGLE_REDIRECT_URI to https://regtech365-product-intelligence-dashboard.onrender.com/auth/google/callback
+# Locally: defaults to http://localhost:8080/auth/google/callback
 REDIRECT_URI = os.getenv('GOOGLE_REDIRECT_URI', 'http://localhost:8080/auth/google/callback')
+RENDER_REDIRECT_URI = 'https://regtech365-product-intelligence-dashboard.onrender.com/auth/google/callback'
+LOCAL_REDIRECT_URI = 'http://localhost:8080/auth/google/callback'
+
+# Build list of valid redirect URIs (both are always registered)
+# This allows testing locally and deploying to Render without code changes
+ALLOWED_REDIRECT_URIS = list({
+    REDIRECT_URI,
+    RENDER_REDIRECT_URI,
+    LOCAL_REDIRECT_URI
+})
+
+# Warn if on Render but GOOGLE_REDIRECT_URI wasn't explicitly set
+if os.getenv('RENDER') and REDIRECT_URI == LOCAL_REDIRECT_URI:
+    logger.warning(
+        "Running on Render but GOOGLE_REDIRECT_URI is still set to localhost. "
+        "Set GOOGLE_REDIRECT_URI=https://regtech365-product-intelligence-dashboard.onrender.com/auth/google/callback"
+    )
+
 
 
 def get_google_auth_url():
     """
-    Generate Google OAuth authorization URL
-    
-    Returns:
-        str: Authorization URL for user to visit
+    Generate Google OAuth authorization URL.
+    The active REDIRECT_URI is used for the flow, but both localhost and Render
+    URIs are registered in the Google Cloud Console.
     """
     flow = Flow.from_client_config(
         {
@@ -36,7 +58,7 @@ def get_google_auth_url():
                 "client_secret": GOOGLE_CLIENT_SECRET,
                 "auth_uri": "https://accounts.google.com/o/oauth2/auth",
                 "token_uri": "https://oauth2.googleapis.com/token",
-                "redirect_uris": [REDIRECT_URI]
+                "redirect_uris": ALLOWED_REDIRECT_URIS
             }
         },
         scopes=SCOPES,
@@ -54,15 +76,8 @@ def get_google_auth_url():
 
 def get_user_info_from_code(code, state):
     """
-    Exchange authorization code for user info
-    
-    Args:
-        code: Authorization code from Google
-        state: State parameter for CSRF protection
-        
-    Returns:
-        dict: User information (email, given_name, family_name, picture)
-        None: If authentication fails
+    Exchange authorization code for user info.
+    Uses the active REDIRECT_URI (local or Render depending on env vars).
     """
     try:
         flow = Flow.from_client_config(
@@ -72,7 +87,7 @@ def get_user_info_from_code(code, state):
                     "client_secret": GOOGLE_CLIENT_SECRET,
                     "auth_uri": "https://accounts.google.com/o/oauth2/auth",
                     "token_uri": "https://oauth2.googleapis.com/token",
-                    "redirect_uris": [REDIRECT_URI]
+                    "redirect_uris": ALLOWED_REDIRECT_URIS
                 }
             },
             scopes=SCOPES,

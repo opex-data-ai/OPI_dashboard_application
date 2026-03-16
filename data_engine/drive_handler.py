@@ -3,24 +3,25 @@ Drive handler - handles fetching files from Google Drive
 """
 import io
 import os
+import logging
 import pandas as pd
-from google.oauth2 import service_account
 from googleapiclient.discovery import build
 from googleapiclient.http import MediaIoBaseDownload
-from data_engine.data_config import DRIVE_SERVICE_ACCOUNT_FILE, DRIVE_FOLDER_ID
+from data_engine.data_config import get_service_account_credentials, DRIVE_FOLDER_ID
+
+logger = logging.getLogger(__name__)
+
+DRIVE_SCOPES = ['https://www.googleapis.com/auth/drive.readonly']
 
 class DriveHandler:
     def __init__(self):
-        self.scopes = ['https://www.googleapis.com/auth/drive.readonly']
         try:
-            # Use service account credentials
-            self.creds = service_account.Credentials.from_service_account_file(
-                DRIVE_SERVICE_ACCOUNT_FILE, scopes=self.scopes)
+            self.creds = get_service_account_credentials(scopes=DRIVE_SCOPES)
             self.service = build('drive', 'v3', credentials=self.creds)
             self.folder_id = DRIVE_FOLDER_ID
-            print("Drive Handler initialized successfully")
+            logger.info("Drive Handler initialized successfully")
         except Exception as e:
-            print(f"Error initializing Drive Handler: {e}")
+            logger.error(f"Error initializing Drive Handler: {e}")
             self.service = None
 
     def list_csv_files(self):

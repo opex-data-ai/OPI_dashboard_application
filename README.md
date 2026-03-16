@@ -60,5 +60,36 @@ A modern, high-performance enterprise dashboard built with [NiceGUI](https://nic
 - `/data_engine`: Data fetching, transformation, and query management logic.
 - `/assets`: Static resources and global styles.
 
+## 🚀 Deploying to Render
+
+Deployed at: **https://regtech365-product-intelligence-dashboard.onrender.com**
+
+The app supports both local (file-based) and Render (env-var-based) credential modes automatically.
+
+### Required Render Environment Variables
+
+| Variable | Description |
+|---|---|
+| `MONGO_URI` | MongoDB Atlas connection string |
+| `STORAGE_SECRET` | NiceGUI session secret key |
+| `GOOGLE_CLIENT_ID` | Google OAuth Client ID |
+| `GOOGLE_CLIENT_SECRET` | Google OAuth Client Secret |
+| `GOOGLE_REDIRECT_URI` | `https://regtech365-product-intelligence-dashboard.onrender.com/auth/google/callback` |
+| `BQ_SERVICE_ACCOUNT_JSON` | Full JSON content of `epi_service_account.json` |
+| `GMAIL_TOKEN_BASE64` | Base64-encoded `token.pickle` (see below) |
+| `BQ_PROJECT_ID` | BigQuery project ID |
+| `BQ_DATASET_ID` | BigQuery dataset ID |
+| `DRIVE_FOLDER_ID` | Google Drive folder ID |
+
+### Generating `GMAIL_TOKEN_BASE64` (run once locally):
+```bash
+python -c "import base64,pickle; print(base64.b64encode(open('token.pickle','rb').read()).decode())"
+```
+
+### Important: Google Cloud Console
+Add **both** of the following to your OAuth app's Authorized Redirect URIs:
+- `http://localhost:8080/auth/google/callback`
+- `https://regtech365-product-intelligence-dashboard.onrender.com/auth/google/callback`
+
 ---
 *Developed by the Data & AI Team*

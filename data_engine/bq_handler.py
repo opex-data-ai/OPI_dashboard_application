@@ -1,21 +1,27 @@
 """
 BigQuery handler - handles fetching table data from BigQuery
 """
+import logging
 import pandas as pd
 from google.cloud import bigquery
-from google.oauth2 import service_account
-from data_engine.data_config import BQ_SERVICE_ACCOUNT_FILE, BQ_PROJECT_ID, BQ_DATASET_ID
+from data_engine.data_config import get_service_account_credentials, BQ_PROJECT_ID, BQ_DATASET_ID
+
+logger = logging.getLogger(__name__)
 
 class BigQueryHandler:
     def __init__(self):
-        self.credentials = service_account.Credentials.from_service_account_file(
-            BQ_SERVICE_ACCOUNT_FILE
-        )
-        self.client = bigquery.Client(
-            credentials=self.credentials,
-            project=BQ_PROJECT_ID
-        )
-        self.dataset_id = BQ_DATASET_ID
+        try:
+            self.credentials = get_service_account_credentials()
+            self.client = bigquery.Client(
+                credentials=self.credentials,
+                project=BQ_PROJECT_ID
+            )
+            self.dataset_id = BQ_DATASET_ID
+            logger.info("BigQueryHandler initialized successfully")
+        except Exception as e:
+            logger.error(f"Failed to initialize BigQueryHandler: {e}")
+            self.client = None
+            self.dataset_id = BQ_DATASET_ID
 
     def list_tables(self):
         """
@@ -29,21 +35,16 @@ class BigQueryHandler:
         return [table.table_id for table in tables]
 
     def download_table_to_df(self, table_name: str):
-        """
-        Download a BigQuery table into a Pandas DataFrame.
-        
-        Args:
-            table_name: The name of the table to download
-            
-        Returns:
-            pd.DataFrame: Table data
-        """
+        """Download a BigQuery table into a Pandas DataFrame."""
+        if not self.client:
+            logger.error("BigQuery client not initialized")
+            return None
         query = f"SELECT * FROM `{BQ_PROJECT_ID}.{self.dataset_id}.{table_name}`"
         try:
-            print(f"🔍 Fetching {table_name} from BigQuery...")
+            logger.info(f"Fetching {table_name} from BigQuery...")
             df = self.client.query(query).to_dataframe()
-            print(f"✅ Successfully fetched {len(df)} rows from {table_name}")
+            logger.info(f"Successfully fetched {len(df)} rows from {table_name}")
             return df
         except Exception as e:
-            print(f"❌ Error fetching {table_name} from BigQuery: {e}")
+            logger.error(f"Error fetching {table_name} from BigQuery: {e}")
             return None
