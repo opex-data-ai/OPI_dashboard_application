@@ -1,3 +1,4 @@
+import asyncio
 from nicegui import ui, app, run
 from components.dashboard_layout import dashboard_layout
 from components.page_template import create_page_template
@@ -161,7 +162,7 @@ async def show_regport_product_page():
 
             refresh_callbacks.append(load_data)
             # Start loading data immediately but asynchronously
-            ui.timer(0, load_data, once=True)
+            asyncio.create_task(load_data())
 
         
         async def acquisition_content():
@@ -256,7 +257,7 @@ async def show_regport_product_page():
                         ui.label('No stickiness data available for the selected period').classes(f'{ThemeManager.COLORS["text"]["muted"]} italic')
             
             refresh_callbacks.append(load_data)
-            ui.timer(0, load_data, once=True)
+            asyncio.create_task(load_data())
         
         async def conversion_content():
             container = ui.column().classes('w-full')
@@ -396,7 +397,7 @@ async def show_regport_product_page():
                         ui.label('No user journey data available for the selected period').classes(f'{ThemeManager.COLORS["text"]["muted"]} italic')
             
             refresh_callbacks.append(load_data)
-            ui.timer(0, load_data, once=True)
+            asyncio.create_task(load_data())
         
         async def engagement_content():
             container = ui.column().classes('w-full')
@@ -450,7 +451,7 @@ async def show_regport_product_page():
                         ui.label('No organization engagement data available').classes(f'{ThemeManager.COLORS["text"]["muted"]} italic')
             
             refresh_callbacks.append(load_data)
-            ui.timer(0, load_data, once=True)
+            asyncio.create_task(load_data())
         
         async def feature_adoption_content():
             container = ui.column().classes('w-full')
@@ -463,7 +464,7 @@ async def show_regport_product_page():
                     ui.label(f'Date range: {start_date} to {end_date}').classes('text-sm text-slate-400 mt-2')
             
             refresh_callbacks.append(load_data)
-            ui.timer(0, load_data, once=True)
+            asyncio.create_task(load_data())
             
         async def organization_deep_dive_content():
             container = ui.column().classes('w-full')

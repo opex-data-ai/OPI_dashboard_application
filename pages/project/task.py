@@ -1,3 +1,4 @@
+import asyncio
 # pages/tasks.py
 from nicegui import ui, app
 from components.dashboard_layout import dashboard_layout
@@ -25,7 +26,7 @@ async def show_tasks_page():
                     ui.label(f'Active range: {start_date} to {end_date}').classes('text-xs text-slate-400')
             
             refresh_callbacks.append(load_data)
-            ui.timer(0, load_data, once=True)
+            asyncio.create_task(load_data())
         
         async def team_tasks_content():
             container = ui.column().classes('w-full')
@@ -37,7 +38,7 @@ async def show_tasks_page():
                     ui.label(f'Active range: {start_date} to {end_date}').classes('text-xs text-slate-400')
             
             refresh_callbacks.append(load_data)
-            ui.timer(0, load_data, once=True)
+            asyncio.create_task(load_data())
         
         async def handle_refresh():
             for callback in refresh_callbacks:

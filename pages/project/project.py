@@ -1,3 +1,4 @@
+import asyncio
 # pages/projects.py
 from nicegui import ui, app
 from components.dashboard_layout import dashboard_layout
@@ -25,7 +26,7 @@ async def show_projects_page():
                     ui.label(f'Filter: {start_date} - {end_date}').classes('text-xs text-slate-400')
             
             refresh_callbacks.append(load_data)
-            ui.timer(0, load_data, once=True)
+            asyncio.create_task(load_data())
         
         async def completed_content():
             container = ui.column().classes('w-full')
@@ -37,7 +38,7 @@ async def show_projects_page():
                     ui.label(f'Filter: {start_date} - {end_date}').classes('text-xs text-slate-400')
             
             refresh_callbacks.append(load_data)
-            ui.timer(0, load_data, once=True)
+            asyncio.create_task(load_data())
         
         async def analytics_content():
             container = ui.column().classes('w-full')
@@ -49,7 +50,7 @@ async def show_projects_page():
                     ui.label(f'Filter: {start_date} - {end_date}').classes('text-xs text-slate-400')
             
             refresh_callbacks.append(load_data)
-            ui.timer(0, load_data, once=True)
+            asyncio.create_task(load_data())
         
         async def handle_refresh():
             for callback in refresh_callbacks:
