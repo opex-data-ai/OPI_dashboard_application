@@ -507,16 +507,18 @@ def get_gmail_service():
 
             # Persist refreshed token
             refreshed_b64 = base64.b64encode(pickle.dumps(creds)).decode()
-            if token_b64:
-                # On Render: log new value so dev can update the env var
+            if os.getenv('RENDER'):
+                # On Render: can't write to disk, so log the new value for the dev to update
                 logger.warning(
                     "Gmail token refreshed. Update GMAIL_TOKEN_BASE64 on Render with the new value:\n"
                     f"{refreshed_b64}"
                 )
             else:
-                # Locally: save back to file
+                # Locally: always save back to file (and optionally update the env var copy)
                 with open('token.pickle', 'wb') as token:
                     pickle.dump(creds, token)
+                logger.info("Gmail token refreshed and saved to token.pickle")
+
         else:
             # Interactive auth — only possible locally
             if os.getenv('RENDER'):

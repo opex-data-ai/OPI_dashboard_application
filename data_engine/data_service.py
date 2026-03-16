@@ -90,7 +90,7 @@ class DataService:
         Args:
             df: Source DataFrame
             
-        Returns:
+        Returns: 
             dict: Summary statistics
         """
         if df is None or df.empty:
