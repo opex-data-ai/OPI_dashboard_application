@@ -113,9 +113,3 @@ ruff_result.txt
 ruff_concise.txt
 verify_mongo.py
 inspect_db.py
-
-
-#ordinary files
-*.csv
-*.txt
-*.json
