@@ -288,24 +288,53 @@ async def reports_page():
 # Handle data loading on startup
 @app.on_startup
 async def load_data():
+    import os
     from data_engine.data_loader import get_data_loader
-    print("App starting... refreshing data from Drive")
+    
+    # --- Startup Diagnostics ---
+    logger.info("=" * 60)
+    logger.info("STARTUP DIAGNOSTICS")
+    critical_vars = ['MONGO_URI', 'STORAGE_SECRET', 'BQ_SERVICE_ACCOUNT_JSON', 'GOOGLE_CLIENT_ID', 'GOOGLE_REDIRECT_URI', 'GMAIL_TOKEN_BASE64']
+    for var in critical_vars:
+        val = os.getenv(var)
+        if val:
+            logger.info(f"  ✅ {var} = SET ({len(val)} chars)")
+        else:
+            logger.warning(f"  ❌ {var} = NOT SET")
+    logger.info("=" * 60)
     
     # Test MongoDB connection
     from services.auth_service import get_db
     try:
         get_db().command('ping')
-        print("MongoDB connected successfully")
+        logger.info("MongoDB connected successfully")
     except Exception as e:
-        print(f"MongoDB connection failed: {e}")
+        logger.error(f"MongoDB connection failed: {e}")
 
+    # Load Drive data into DuckDB
     try:
         loader = get_data_loader()
-        # Run in a thread if it's blocking, but usually ok for startup
-        loader.load_all_data()
-        print("Startup data load completed")
+        result = loader.load_all_data()
+        
+        # Report what tables were loaded
+        try:
+            tables = loader.con.execute("SHOW TABLES").fetchdf()
+            table_list = tables['name'].tolist() if not tables.empty else []
+            data_tables = [t for t in table_list if not t.startswith('_')]
+            if data_tables:
+                logger.info(f"DuckDB loaded {len(data_tables)} table(s): {data_tables}")
+            else:
+                logger.error(
+                    "DuckDB has NO data tables after startup! "
+                    "Dashboard queries will all fail. "
+                    "Check that BQ_SERVICE_ACCOUNT_JSON is set correctly on Render."
+                )
+        except Exception as e:
+            logger.error(f"Could not inspect DuckDB tables: {e}")
+            
+        logger.info("Startup data load completed")
     except Exception as e:
-        print(f"Error during startup data load: {e}")
+        logger.error(f"Error during startup data load: {e}")
 
 @app.on_shutdown
 def shutdown():

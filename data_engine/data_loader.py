@@ -17,6 +17,16 @@ logger = logging.getLogger(__name__)
 
 class DataLoader:
     def __init__(self):
+        # Validate credentials before attempting to connect
+        import os
+        if not os.getenv('BQ_SERVICE_ACCOUNT_JSON') and not os.path.exists('epi_service_account.json'):
+            logger.error(
+                "STARTUP FAILURE: No service account credentials found!\n"
+                "  - On Render: set BQ_SERVICE_ACCOUNT_JSON env var (paste the full JSON content of epi_service_account.json)\n"
+                "  - Locally: ensure epi_service_account.json exists in the project root\n"
+                "  Drive data will NOT load without credentials — all dashboard queries will fail."
+            )
+
         self.bq_handler = BigQueryHandler()
         self.drive_handler = DriveHandler()
         self.con = duckdb.connect(str(DB_PATH))

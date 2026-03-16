@@ -15,14 +15,24 @@ DRIVE_SCOPES = ['https://www.googleapis.com/auth/drive.readonly']
 
 class DriveHandler:
     def __init__(self):
+        import traceback
+        self.service = None
+        self.folder_id = DRIVE_FOLDER_ID
+
+        # Step 1: Load credentials
         try:
             self.creds = get_service_account_credentials(scopes=DRIVE_SCOPES)
-            self.service = build('drive', 'v3', credentials=self.creds)
-            self.folder_id = DRIVE_FOLDER_ID
-            logger.info("Drive Handler initialized successfully")
+            logger.info("Drive credentials loaded successfully")
         except Exception as e:
-            logger.error(f"Error initializing Drive Handler: {e}")
-            self.service = None
+            logger.error(f"Drive Handler: FAILED to load credentials — {e}\n{traceback.format_exc()}")
+            return
+
+        # Step 2: Build Drive service
+        try:
+            self.service = build('drive', 'v3', credentials=self.creds)
+            logger.info("Drive Handler initialized successfully (folder: %s)", self.folder_id)
+        except Exception as e:
+            logger.error(f"Drive Handler: FAILED to build Drive service — {e}\n{traceback.format_exc()}")
 
     def list_csv_files(self):
         """
