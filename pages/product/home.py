@@ -6,6 +6,7 @@ from data_engine.query_store import QUERIES
 from components.chart_components import create_bar_chart, create_column_chart, create_line_chart
 from components.filters import create_filter_bar
 from components.theme_manager import ThemeManager
+from data_engine.chart_descriptions import METRIC_INFO
 import asyncio
 import inspect
 import pandas as pd
@@ -119,25 +120,47 @@ async def show_product_home_page():
                     'multi_rate': f"{multi_platform_rate * 100:.1f}%",
                     'full_rate': f"{full_ecosystem_rate * 100:.1f}%"
                 }
+                
+                # Populate METRIC_INFO for AI insights
+                METRIC_INFO['ecosystem_orgs']['chart_data'] = {'total_orgs': total_ecosystem_orgs}
+                METRIC_INFO['ecosystem_users']['chart_data'] = {'total_users': total_ecosystem_users}
+                METRIC_INFO['ecosystem_platforms']['chart_data'] = {'total_platforms': total_platforms}
+                METRIC_INFO['multi_platform_rate']['chart_data'] = {'rate': multi_platform_rate}
+                METRIC_INFO['full_ecosystem_rate']['chart_data'] = {'rate': full_ecosystem_rate}
 
                 content_container.clear()
                 with content_container:
                     # 1. Stats Row (KPIs) - Responsive Grid
                     with ui.grid(columns=5).classes('w-full gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 items-stretch'):
                         stats_config = [
-                            {'title': 'Total Ecosystem Organizations', 'value': stats_data['total_orgs'], 'icon': 'domain', 'color': 'purple'},
-                            {'title': 'Total Ecosystem Users', 'value': stats_data['total_users'], 'icon': 'groups', 'color': 'blue'},
-                            {'title': 'Total Platforms', 'value': stats_data['total_platforms'], 'icon': 'layers', 'color': 'green'},
-                            {'title': 'Multi-platform Adoption Rate', 'value': stats_data['multi_rate'], 'icon': 'hub', 'color': 'orange'},
-                            {'title': 'Full Ecosystem Adoption Rate', 'value': stats_data['full_rate'], 'icon': 'verified', 'color': 'indigo'}
+                            {'id': 'ecosystem_orgs', 'title': 'Total Ecosystem Organizations', 'value': stats_data['total_orgs'], 'icon': 'domain', 'color': 'purple'},
+                            {'id': 'ecosystem_users', 'title': 'Total Ecosystem Users', 'value': stats_data['total_users'], 'icon': 'groups', 'color': 'blue'},
+                            {'id': 'ecosystem_platforms', 'title': 'Total Platforms', 'value': stats_data['total_platforms'], 'icon': 'layers', 'color': 'green'},
+                            {'id': 'multi_platform_rate', 'title': 'Multi-platform Adoption Rate', 'value': stats_data['multi_rate'], 'icon': 'hub', 'color': 'orange'},
+                            {'id': 'full_ecosystem_rate', 'title': 'Full Ecosystem Adoption Rate', 'value': stats_data['full_rate'], 'icon': 'verified', 'color': 'indigo'}
                         ]
                         
                         for stat in stats_config:
-                            with ui.card().classes(f'h-full p-6 {ThemeManager.get_card_style()} hover:shadow-md transition-shadow flex flex-col'):
-                                with ui.row().classes('w-full justify-between items-start mb-2 no-wrap shrink-0'):
-                                    ui.label(stat['title']).classes(ThemeManager.TYPOGRAPHY['small'] + ' font-semibold tracking-wider')
-                                    ui.icon(stat['icon']).classes(f'text-sm text-{stat["color"]}-500 bg-{stat["color"]}-50 p-2 rounded-lg shrink-0 ml-2')
-                                ui.label(stat['value']).classes(ThemeManager.TYPOGRAPHY['h1'].replace('text-4xl', 'text-2xl') + ' mt-auto leading-none')
+                            with ui.card().classes(f'h-full p-6 pt-4 {ThemeManager.get_card_style()} hover:shadow-md transition-shadow flex flex-col'): # Reduced top padding
+                                with ui.row().classes('w-full justify-between items-start mb-1 no-wrap shrink-0'): # Reduced mb
+                                    ui.label(stat['title']).classes(ThemeManager.TYPOGRAPHY['small'] + ' font-bold tracking-wider')
+                                    
+                                    with ui.row().classes('items-center gap-2'):
+                                        # Info Icon with Popover
+                                        if 'id' in stat:
+                                            desc_data = METRIC_INFO.get(stat['id'])
+                                            if desc_data:
+                                                with ui.button(icon='info_outline', color='slate-100').props('flat round size=sm').classes('opacity-60 hover:opacity-100 p-0'):
+                                                    with ui.menu().classes('p-4 max-w-xs shadow-2xl rounded-xl border border-slate-100'):
+                                                        ui.label(desc_data['title']).classes('font-bold text-slate-900 mb-1')
+                                                        ui.label(desc_data['description']).classes('text-sm text-slate-600 leading-normal')
+                                                
+                                                # AI Insight Icon
+                                                if desc_data.get('show_ai_icon'):
+                                                    from components.chart_components import show_ai_insight_dialog
+                                                    ui.button(icon='auto_awesome', color='amber').props('flat round size=sm').classes('p-0').on('click', lambda s=stat['id']: show_ai_insight_dialog(s))
+                                
+                                ui.label(stat['value']).classes(ThemeManager.TYPOGRAPHY['h1'].replace('text-4xl', 'text-2xl') + ' mt-auto leading-none pt-2')
 
                     # 2. Charts Row (Organizations & Users) - Side by Side Responsive Grid
                     with ui.grid(columns=2).classes('w-full gap-6 grid-cols-1 lg:grid-cols-2 items-stretch mt-4'):
@@ -146,13 +169,17 @@ async def show_product_home_page():
                             org_data = results['organization_by_platform']
                             org_data = org_data[org_data['platform'].str.lower() != 'unknown']
                             
+                            # Data for AI
+                            METRIC_INFO['org_breakdown']['chart_data'] = org_data.to_dict('records')
+
                             create_bar_chart(
                                 org_data, 
-                                'Platform Organization Breakdown',  # Removed header label
+                                'Platform Organization Breakdown',  
                                 'platform', 
                                 ['total_orgs'],
                                 height='h-72',
-                                labels = ['Total Organizations']
+                                labels = ['Total Organizations'],
+                                id='org_breakdown'
                             )
 
                         # Chart 2: Signed-In Users (Vertical Column)
@@ -160,12 +187,16 @@ async def show_product_home_page():
                             user_data = results['user_by_platform']
                             user_data = user_data[user_data['platform'].str.lower() != 'unknown']
 
+                            # Data for AI
+                            METRIC_INFO['user_breakdown']['chart_data'] = user_data.to_dict('records')
+
                             create_column_chart(
                                 user_data,
-                                'Platform User Breakdown', # Removed header label
+                                'Platform User Breakdown', 
                                 'platform',
                                 ['total_users'],
-                                height='h-72'
+                                height='h-72',
+                                id='user_breakdown'
                             )
 
                     # --- NEW LINE CHARTS SECTION (COMMENTED OUT) ---

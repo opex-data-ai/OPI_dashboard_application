@@ -16,17 +16,32 @@ async def show_overview_page():
         # Stats cards
         with ui.row().classes('w-full gap-4 mb-6'):
             stats = [
-                {'title': 'Total Revenue', 'value': '$2.4M', 'change': '+12.5%', 'icon': 'attach_money', 'color': 'orange'},
-                {'title': 'Active Projects', 'value': '24', 'change': '+4.2%', 'icon': 'work', 'color': 'red'},
-                {'title': 'Team Utilization', 'value': '87%', 'change': '-2.1%', 'icon': 'groups', 'color': 'blue'},
-                {'title': 'Performance Score', 'value': '92', 'change': '+5.8%', 'icon': 'trending_up', 'color': 'pink'}
+                {'id': 'overview_revenue', 'title': 'Total Revenue', 'value': '$2.4M', 'change': '+12.5%', 'icon': 'attach_money', 'color': 'orange'},
+                {'id': 'overview_projects', 'title': 'Active Projects', 'value': '24', 'change': '+4.2%', 'icon': 'work', 'color': 'red'},
+                {'id': 'overview_utilization', 'title': 'Team Utilization', 'value': '87%', 'change': '-2.1%', 'icon': 'groups', 'color': 'blue'},
+                {'id': 'overview_score', 'title': 'Performance Score', 'value': '92', 'change': '+5.8%', 'icon': 'trending_up', 'color': 'pink'}
             ]
             
             for stat in stats:
-                with ui.card().classes(f'flex-1 p-6 {ThemeManager.get_card_style()}'):
-                    with ui.row().classes('w-full justify-between items-start mb-3'):
-                        ui.label(stat['title']).classes(ThemeManager.TYPOGRAPHY['small'])
-                        ui.icon(stat['icon']).classes(f'text-2xl text-{stat["color"]}-500')
+                with ui.card().classes(f'flex-1 p-6 pt-4 {ThemeManager.get_card_style()}'): # Reduced top padding
+                    with ui.row().classes('w-full justify-between items-start mb-1'): # Reduced mb
+                        ui.label(stat['title']).classes(ThemeManager.TYPOGRAPHY['small'] + ' font-bold')
+                        
+                        with ui.row().classes('items-center gap-2'):
+                            # Info Icon with Popover
+                            if 'id' in stat:
+                                from data_engine.chart_descriptions import METRIC_INFO
+                                desc_data = METRIC_INFO.get(stat['id'])
+                                if desc_data:
+                                    with ui.button(icon='info_outline', color='slate-100').props('flat round size=sm').classes('opacity-60 hover:opacity-100 p-0'):
+                                        with ui.menu().classes('p-4 max-w-xs shadow-2xl rounded-xl border border-slate-100'):
+                                            ui.label(desc_data['title']).classes('font-bold text-slate-900 mb-1')
+                                            ui.label(desc_data['description']).classes('text-sm text-slate-600 leading-normal')
+
+                                    # AI Insight Icon
+                                    if desc_data.get('show_ai_icon'):
+                                        from components.chart_components import show_ai_insight_dialog
+                                        ui.button(icon='auto_awesome', color='amber').props('flat round size=sm').classes('p-0').on('click', lambda s=stat['id']: show_ai_insight_dialog(s))
                     ui.label(stat['value']).classes('text-3xl font-bold text-slate-900 mb-1')
                     ui.label(f"{stat['change']} vs last month").classes(
                         f'text-sm {ThemeManager.COLORS["accent"]["success"]}' if '+' in stat['change'] else f'text-sm {ThemeManager.COLORS["accent"]["danger"]}'

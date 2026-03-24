@@ -6,7 +6,7 @@ def show_landing_page():
     ui.add_head_html('<link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">')
 
     # ---------------------------
-    # Header (Logo + Auth Buttons)
+    # Header (Logo + Auth Buttons) 
     # ---------------------------
     with ui.row().classes('w-full justify-between items-center border-b-2 border-gray-200 p-4'):
         # Left: Logo

@@ -130,6 +130,42 @@ ui.add_head_html('''
 ui.add_head_html('''
     <script src="https://cdn.jsdelivr.net/npm/echarts/dist/echarts.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/echarts/map/js/world.js"></script>
+    <script>
+        function downloadChart(chartId, fileName) {
+            const chartElement = document.getElementById(chartId);
+            if (!chartElement) {
+                console.error('Chart element not found:', chartId);
+                return;
+            }
+            const chart = echarts.getInstanceByDom(chartElement);
+            if (chart) {
+                const url = chart.getDataURL({
+                    type: 'png',
+                    pixelRatio: 2,
+                    backgroundColor: '#fff',
+                    excludeComponents: ['toolbox']
+                });
+                const link = document.createElement('a');
+                link.href = url;
+                link.download = fileName + '.png';
+                link.click();
+            } else {
+                console.error('ECharts instance not found for:', chartId);
+            }
+        }
+
+        function downloadPlotly(chartId, fileName) {
+            const chartElement = document.getElementById(chartId);
+            if (chartElement) {
+                Plotly.downloadImage(chartElement, {
+                    format: 'png',
+                    width: 1200,
+                    height: 800,
+                    filename: fileName
+                });
+            }
+        }
+    </script>
 ''', shared=True)
 
 

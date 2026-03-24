@@ -14,6 +14,6 @@ requests
 fastapi
 uvicorn
 pymongo[srv]
-python-dotenv
 bcrypt
 google-api-python-client
+google-genai

@@ -1,4 +1,5 @@
 import asyncio
+from datetime import datetime, timedelta
 from nicegui import ui, app, run
 from components.dashboard_layout import dashboard_layout
 from components.page_template import create_page_template
@@ -8,7 +9,6 @@ from components.chart_components import (
     create_bar_chart,
     create_donut_chart,
     create_metric_table,
-    create_gauge_chart,
     create_country_metrics_row,
     create_line_chart,
     create_traffic_source_row,
@@ -22,7 +22,7 @@ import inspect
 from components.theme_manager import ThemeManager
 from data_engine.module_mapping import map_path_to_module, map_path_to_landing
 from utils.formatters import format_msec_to_time
-
+from data_engine.chart_descriptions import METRIC_INFO
 
 
 async def show_regport_product_page():
@@ -34,8 +34,10 @@ async def show_regport_product_page():
         
         def get_current_dates():
             date_range = app.storage.user.get('date_range', {})
-            start = date_range.get('from', '2026-01-01').replace('/', '-')
-            end = date_range.get('to', '2026-01-14').replace('/', '-')
+            default_end = datetime.today().strftime('%Y-%m-%d')
+            default_start = (datetime.today() - timedelta(days=30)).strftime('%Y-%m-%d')
+            start = date_range.get('from', default_start).replace('/', '-')
+            end = date_range.get('to', default_end).replace('/', '-')
             return start, end
 
         async def fetch_core_metrics():
@@ -100,37 +102,45 @@ async def show_regport_product_page():
                     anonymous_visitors = int(anon_data.iloc[0]['anonymous_visitors']) if not anon_data.empty else 0
                     signed_in_visitors = active_users
 
+                    # Populate METRIC_INFO with raw data for AI insights
+                    METRIC_INFO['active_org_rate']['chart_data'] = {'active_orgs': active_orgs, 'total_orgs': total_orgs}
+                    METRIC_INFO['active_users_rate']['chart_data'] = {'active_users': active_users, 'total_users': total_users}
+                    METRIC_INFO['anonymous_users_rate']['chart_data'] = {'anonymous_visitors': anonymous_visitors, 'signed_in_visitors': signed_in_visitors}
+
                     # 1. Comparison Cards
                     create_comparison_cards([
                         {
+                            'id': 'active_org_rate',
                             'title': 'Active Organization Rate',
                             'metric_a_name': 'All Organization',
                             'metric_a_value': total_orgs,
                             'metric_b_name': 'Active Organization',
                             'metric_b_value': active_orgs,
                             'icon': 'corporate_fare',
-                            'color': 'indigo',
-                            'pct_method': 'divide'
+                            'pct_method': 'divide',
+                            'pct_bar': True
                         },
                         {
+                            'id': 'active_users_rate',
                             'title': 'Active User Rate',
                             'metric_a_name': 'All Users',
                             'metric_a_value': total_users,
                             'metric_b_name': 'Active Users',
                             'metric_b_value': active_users,
                             'icon': 'person_search',
-                            'color': 'emerald',
-                            'pct_method': 'divide'
+                            'pct_method': 'divide',
+                            'pct_bar': True
                         },
                         {
+                            'id': 'anonymous_users_rate',
                             'title': 'Anonymous User Rate',
                             'metric_a_name': 'Anonymous Visitors',
                             'metric_a_value': anonymous_visitors,
                             'metric_b_name': 'Signed-In Users',
                             'metric_b_value': signed_in_visitors,
                             'icon': 'group_work',
-                            'color': 'amber',
-                            'pct_method': 'total'
+                            'pct_method': 'total',
+                            'pct_bar': True
                         }
                     ])
 
@@ -141,6 +151,9 @@ async def show_regport_product_page():
                         # Ensure date is string format for chart
                         trend_data['date_str'] = pd.to_datetime(trend_data['date']).dt.strftime('%Y-%m-%d')
                         
+                        # Data for AI
+                        METRIC_INFO['user_acquisition_trend']['chart_data'] = trend_data.to_dict('records')
+
                         create_line_chart(
                             trend_data,
                             'User Acquisition Trend',
@@ -149,7 +162,8 @@ async def show_regport_product_page():
                                 'signed_in_users': 'Signed-In Users',
                                 'anonymous_users': 'Anonymous Users'
                             },
-                            y_axis_name='Users'
+                            y_axis_name='Users',
+                            id='user_acquisition_trend'
                         )
                     else:
                         ui.label('No trend data available').classes('text-slate-500 italic')
@@ -190,15 +204,19 @@ async def show_regport_product_page():
                         # Aggregate by country for the map
                         country_data = geo_data.groupby('country', as_index=False).agg({
                             'total_visitors': 'sum',
-                            'signed_in_users': 'sum',
-                            'sessions': 'sum',
-                            'page_views': 'sum'
+                            'signed_in_users': 'sum'
                         })
                         
+                        # Data for AI
+                        METRIC_INFO['map_distribution']['chart_data'] = country_data.to_dict('records')
+                        METRIC_INFO['country_breakdown']['chart_data'] = country_data.to_dict('records')
+                        
                         create_country_metrics_row(
-                            country_data,
-                            'User Distribution by Country',
-                            'total_visitors'
+                            data=country_data,
+                            title='User Distribution by Country',
+                            value_col='total_visitors',
+                            id_1='map_distribution',
+                            id_2='country_breakdown'
                         )
                     else:
                         ui.label('No geographic data available for the selected period').classes(f'{ThemeManager.COLORS["text"]["muted"]} italic')
@@ -209,12 +227,17 @@ async def show_regport_product_page():
                         traffic_source = traffic_source_medium_data.groupby('acquisition_source', as_index=False).agg({'new_visitors': 'sum'})
                         traffic_medium = traffic_source_medium_data.groupby('acquisition_medium', as_index=False).agg({'new_visitors': 'sum'})
                         
+                        # Data for AI
+                        METRIC_INFO['traffic_source']['chart_data'] = traffic_source_medium_data.to_dict('records')
+
                         create_traffic_source_row(source_data=traffic_source,
-                                                  source_title='New Users by Primary Source',
+                                                  source_title='Users Acquisition Source',
+                                                  id_1='traffic_source',
                                                   medium_data=traffic_medium,
-                                                  medium_title='New Users by Primary Medium',
+                                                  medium_title='Users Acquisition Medium',
                                                   value_col='new_visitors',
-                                                  value_label='New Users'
+                                                  value_label='New Users',
+                                                  id_2='traffic_medium'
                         )
                     else:
                         ui.label('No traffic source data available for the selected period').classes(f'{ThemeManager.COLORS["text"]["muted"]} italic')
@@ -225,12 +248,17 @@ async def show_regport_product_page():
                         session_source = session_source_medium_data.groupby('session_source', as_index=False).agg({'session_count': 'sum'})
                         session_medium = session_source_medium_data.groupby('session_medium', as_index=False).agg({'session_count': 'sum'})
 
+                        # Data for AI
+                        METRIC_INFO['traffic_source']['chart_data'] = session_source_medium_data.to_dict('records')
+
                         create_traffic_source_row(source_data=session_source,
-                                                  source_title='Session Traffic by Primary Source',
+                                                  source_title='Traffic Acquisition Source',
+                                                  id_1='traffic_source',
                                                   medium_data=session_medium,
-                                                  medium_title='Session Traffic by Primary Medium',
+                                                  medium_title='Traffic Acquisition Medium',
                                                   value_col='session_count',
-                                                  value_label='Sessions'
+                                                  value_label='Sessions',
+                                                  id_2='traffic_medium'
                         )
                     else:
                         ui.label('No session traffic data available for the selected period').classes(f'{ThemeManager.COLORS["text"]["muted"]} italic')
@@ -242,6 +270,9 @@ async def show_regport_product_page():
                         # Ensure date is datetime and string format for chart
                         stickiness_data['date'] = pd.to_datetime(stickiness_data['date']).dt.strftime('%Y-%m-%d')
                         
+                        # Data for AI
+                        METRIC_INFO['stickiness_ratios']['chart_data'] = stickiness_data.to_dict('records')
+
                         create_line_chart(
                             stickiness_data,
                             'User Stickiness (DAU/WAU, DAU/MAU, WAU/MAU)',
@@ -251,7 +282,8 @@ async def show_regport_product_page():
                                 'dau_mau_ratio': 'DAU/MAU',
                                 'wau_mau_ratio': 'WAU/MAU'
                             },
-                            y_axis_name='Ratio'
+                            y_axis_name='Ratio',
+                            id='stickiness_ratios'
                         )
                     else:
                         ui.label('No stickiness data available for the selected period').classes(f'{ThemeManager.COLORS["text"]["muted"]} italic')
@@ -294,7 +326,7 @@ async def show_regport_product_page():
                         row = results['avg_pages'].iloc[0]
                         avg_pages = row.get('avg_pages_per_session')
                         if pd.notna(avg_pages):
-                            kpis.append({'label': 'Avg Pages / Session', 'value': f"{avg_pages:.1f}", 'color': 'indigo', 'subtitle': f"Max: {row.get('max_pages_in_session', 0)} | Min: {row.get('min_pages_in_session', 0)}"})
+                            kpis.append({'id': 'avg_pages_session', 'label': 'Avg Pages / Session', 'value': f"{avg_pages:.1f}", 'color': 'indigo', 'subtitle': f"Max: {row.get('max_pages_in_session', 0)} | Min: {row.get('min_pages_in_session', 0)}"})
                     
                     # KPI 2: Time to Signup
                     if not results['time_to_signup'].empty:
@@ -302,16 +334,21 @@ async def show_regport_product_page():
                         avg_msec = row.get('avg_time_to_first_signup_msec')
                         median_msec = row.get('median_time_to_first_signup_msec')
                         if pd.notna(avg_msec):
-                            kpis.append({'label': 'Avg Time to Signup', 'value': format_msec_to_time(avg_msec), 'color': 'emerald', 'subtitle': f"Median: {format_msec_to_time(median_msec)}"})
+                            kpis.append({'id': 'avg_time_signup', 'label': 'Avg Time to Signup', 'value': format_msec_to_time(avg_msec), 'color': 'emerald', 'subtitle': f"Median: {format_msec_to_time(median_msec)}"})
                     
                     # KPI 3: Exit Rate on Landing Page
                     if not results['exit_rate'].empty:
                         row = results['exit_rate'].iloc[0]
                         exit_rate = row.get('exit_rate_pct')
                         if pd.notna(exit_rate):
-                            kpis.append({'label': 'Landing Page Exit Rate', 'value': f"{exit_rate:.1f}%", 'color': 'rose', 'subtitle': 'Single page sessions'})
+                            kpis.append({'id': 'landing_exit_rate', 'label': 'Landing Page Exit Rate', 'value': f"{exit_rate:.1f}%", 'color': 'rose', 'subtitle': 'Single page sessions'})
                     
                     if kpis:
+                        # KPI data for AI
+                        METRIC_INFO['avg_pages_session']['chart_data'] = results['avg_pages'].to_dict('records') if not results['avg_pages'].empty else None
+                        METRIC_INFO['avg_time_signup']['chart_data'] = results['time_to_signup'].to_dict('records') if not results['time_to_signup'].empty else None
+                        METRIC_INFO['landing_exit_rate']['chart_data'] = results['exit_rate'].to_dict('records') if not results['exit_rate'].empty else None
+
                         create_kpi_metrics(kpis)
                     else:
                         ui.label('No conversion data available').classes(f'{ThemeManager.COLORS["text"]["muted"]} italic')
@@ -324,35 +361,41 @@ async def show_regport_product_page():
                             m = row['metric']
                             if m == 'avg_engagement_time_msec':
                                 comparison_data.append({
+                                    'id': 'engaged_vs_churned',
                                     'title': 'Avg Engagement Time',
                                     'metric_a_name': 'Engaged',
-                                    'metric_a_value': float(row['engaged_value']),
+                                    'metric_a_value': format_msec_to_time(float(row['engaged_value'])),
                                     'metric_b_name': 'Churned',
-                                    'metric_b_value': float(row['churned_value']),
+                                    'metric_b_value': format_msec_to_time(float(row['churned_value'])),
                                     'icon': 'timer',
-                                    'color': 'blue'
+                                    'pct_bar': False
                                 })
                             elif m == 'avg_pages_per_session':
                                 comparison_data.append({
+                                    'id': 'engaged_vs_churned',
                                     'title': 'Avg Pages Per Session',
                                     'metric_a_name': 'Engaged',
                                     'metric_a_value': float(row['engaged_value']),
                                     'metric_b_name': 'Churned',
                                     'metric_b_value': float(row['churned_value']),
                                     'icon': 'description',
-                                    'color': 'green'
+                                    'pct_bar': False
                                 })
                             elif m == 'avg_key_events':
                                 comparison_data.append({
+                                    'id': 'engaged_vs_churned',
                                     'title': 'Avg Key Events',
                                     'metric_a_name': 'Engaged',
                                     'metric_a_value': float(row['engaged_value']),
                                     'metric_b_name': 'Churned',
                                     'metric_b_value': float(row['churned_value']),
                                     'icon': 'stars',
-                                    'color': 'orange'
+                                    'pct_bar': False
                                 })
                         
+                        # Data for AI
+                        METRIC_INFO['engaged_vs_churned']['chart_data'] = results['comparison_metrics'].to_dict('records')
+
                         # Display all 3 cards in one row
                         create_comparison_cards(comparison_data)
                     else:
@@ -384,7 +427,9 @@ async def show_regport_product_page():
                                 
                             df_funnel = df_funnel.sort_values('user_count', ascending=False)
                             
-                            create_metric_table(df_funnel, title="Next Common Action by Landing Page", height='h-[400px]')
+                            METRIC_INFO['funnel_analysis']['chart_data'] = df_funnel.to_dict('records')
+                            
+                            create_metric_table(df_funnel, title="Next Common Action by Landing Page", height='h-[400px]', id='funnel_analysis')
                         else:
                             ui.label('No module-level conversion actions found').classes(f'{ThemeManager.COLORS["text"]["muted"]} italic')
                     else:
@@ -392,7 +437,8 @@ async def show_regport_product_page():
 
                     # User Journeys
                     if not results['user_journey'].empty:
-                        create_user_journey_section(results['user_journey'])
+                        METRIC_INFO['user_journeys']['chart_data'] = results['user_journey'].to_dict('records')
+                        create_user_journey_section(results['user_journey'], id='user_journeys')
                     else:
                         ui.label('No user journey data available for the selected period').classes(f'{ThemeManager.COLORS["text"]["muted"]} italic')
             
@@ -425,28 +471,34 @@ async def show_regport_product_page():
                     if not results['engagement_kpis'].empty:
                         row = results['engagement_kpis'].iloc[0]
                         kpis = [
-                            {'label': 'Avg Engaged Duration', 'value': format_msec_to_time(row['avg_engaged_duration_msec']), 'icon': 'timer', 'color': 'blue', 'subtitle': 'Total time per user'},
+                            {'id': 'avg_engagement_time_msec', 'label': 'Avg Engaged Duration', 'value': format_msec_to_time(row['avg_engaged_duration_msec']), 'icon': 'timer', 'color': 'blue'},
                             {'label': 'Engaged Sessions', 'value': row['engaged_sessions'], 'icon': 'bolt', 'color': 'green'},
-                            {'label': 'Engagement Rate', 'value': f"{row['engagement_rate']}%", 'icon': 'trending_up', 'color': 'orange'},
+                            {'id': 'engagement_rate', 'label': 'Engagement Rate', 'value': f"{row['engagement_rate']}%", 'icon': 'trending_up', 'color': 'orange'},
                             {'label': 'Total Events', 'value': row['total_event_count'], 'icon': 'event', 'color': 'indigo'},
                             {'label': 'Key Events', 'value': row['key_event_count'], 'icon': 'stars', 'color': 'purple'},
                             {'label': 'Page Views', 'value': row['total_page_views'], 'icon': 'description', 'color': 'pink'}
                         ]
-                        create_kpi_metrics(kpis)
+                        # Data for AI
+                        METRIC_INFO['engagement_rate']['chart_data'] = row.to_dict()
+                        
+                        create_kpi_metrics(kpis[:3])  # Row 1: Avg Engaged Duration, Engaged Sessions, Engagement Rate
+                        create_kpi_metrics(kpis[3:])  # Row 2: Total Events, Key Events, Page Views
                     else:
                         ui.label('No engagement data available').classes(f'{ThemeManager.COLORS["text"]["muted"]} italic mt-4')
 
                     # 1. Page Engagement Table
                     ui.label('Page Engagement Analysis').classes(ThemeManager.TYPOGRAPHY['h3'] + ' mt-8 mb-4')
                     if not results['page_engagement'].empty:
-                        create_metric_table(results['page_engagement'], title="Engagement Metrics by Page", height='h-[400px]')
+                        METRIC_INFO['page_engagement']['chart_data'] = results['page_engagement'].to_dict('records')
+                        create_metric_table(results['page_engagement'], title="Engagement Metrics by Page", height='h-[400px]', id='page_engagement')
                     else:
                         ui.label('No page engagement data available').classes(f'{ThemeManager.COLORS["text"]["muted"]} italic')
 
                     # 2. Organization Engagement Table
                     ui.label('Organization Engagement Analysis').classes(ThemeManager.TYPOGRAPHY['h3'] + ' mt-8 mb-4')
                     if not results['org_engagement'].empty:
-                        create_metric_table(results['org_engagement'], title="Engagement Metrics by Organization", height='h-[400px]')
+                        METRIC_INFO['org_engagement']['chart_data'] = results['org_engagement'].to_dict('records')
+                        create_metric_table(results['org_engagement'], title="Engagement Metrics by Organization", height='h-[400px]', id='org_engagement')
                     else:
                         ui.label('No organization engagement data available').classes(f'{ThemeManager.COLORS["text"]["muted"]} italic')
             
