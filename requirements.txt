@@ -17,3 +17,4 @@ pymongo[srv]
 bcrypt
 google-api-python-client
 google-genai
+openpyxl
