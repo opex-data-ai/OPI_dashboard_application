@@ -11,25 +11,14 @@ def show_login_page():
     ui.add_head_html('<script>document.body.classList.add("no-scroll");</script>')
 
 
-    with ui.row().classes(
-        'h-screen w-screen bg-slate-100 items-center justify-center m-0 p-0'
-    ):
-
-        with ui.card().classes(
-            'w-full max-w-md p-6 rounded-2xl shadow-xl border border-slate-200'
-        ):
-
+    with ui.row().classes('h-screen w-screen m-0 p-0 overflow-hidden bg-slate-50 items-center justify-center'):
+        with ui.card().classes('w-full max-w-md p-8 rounded-2xl shadow-xl border border-slate-200 bg-white'):
             # --------------------
             # Header
             # --------------------
-            with ui.column().classes('w-full items-center mb-2 gap-1'):
-                ui.icon('lock_open').classes(f'text-4xl text-{ThemeManager.get_primary_color()}')
-                ui.label('Welcome Back').classes(
-                    'text-xl font-black text-slate-900 leading-tight'
-                )
-                ui.label('Sign in to EPI').classes(
-                    'text-slate-500 text-xs'
-                )
+            with ui.column().classes('w-full items-center mb-6 gap-1'):
+                ui.label('Welcome back').classes('text-3xl font-bold text-slate-900 tracking-tight text-center')
+                ui.label('Sign in to your account').classes('text-sm text-slate-500 text-center')
 
             # --------------------
             # Google Sign-In
@@ -76,7 +65,7 @@ def show_login_page():
             # Input Fields
             with ui.column().classes('w-full gap-3'):
                 email_input = ui.input(label='Email Address').classes('w-full')
-                
+            
                 # Password field with visibility toggle
                 # Password field with visibility toggle
                 password_input = ui.input(
@@ -92,7 +81,7 @@ def show_login_page():
 
                 def toggle_password():
                     is_password = password_input.props.get('type', 'password') == 'password'
-                    
+                
                     if is_password:
                         password_input.props('type=text')
                         eye_button.props('icon=visibility')
@@ -107,7 +96,7 @@ def show_login_page():
                 ui.link(
                     'Forgot password?', '/forgot'
                 ).classes(
-                    f'text-xs text-{ThemeManager.get_primary_color()} no-underline'
+                    'text-xs text-indigo-600 font-medium no-underline hover:text-indigo-800'
                 )
 
             # --------------------
@@ -120,7 +109,7 @@ def show_login_page():
                         email_input.value,
                         password_input.value
                     )  
-                    
+                
                     print("Login result:", result)
                     if not result:
                         ui.notify('Invalid credentials', color='red')
@@ -149,7 +138,7 @@ def show_login_page():
                     from services.auth_service import get_user_settings, get_user_notifications
                     settings = await run.io_bound(get_user_settings, result['email'])
                     notifications = await run.io_bound(get_user_notifications, result['email'])
-                    
+                
                     app.storage.user['theme_mode'] = settings.get('theme', 'light')
                     app.storage.user['notifications'] = notifications
 
@@ -162,18 +151,22 @@ def show_login_page():
                     print("Login error:", e)
                     ui.notify('An error occurred during login', color='red')
 
+            # Bind Enter key to submit login
+            email_input.on('keydown.enter', login_click)
+            password_input.on('keydown.enter', login_click)
+
             # --------------------
             # Login Button
             # --------------------
             ui.button(
                 'Sign In', on_click=login_click
-            ).props('elevated').classes(f'w-full py-2 mt-3 bg-{ThemeManager.get_primary_color()} text-white rounded-xl font-bold shadow-lg shadow-blue-100')
+            ).props('unelevated').classes('w-full py-2 mt-3 rounded-xl font-bold shadow-lg shadow-indigo-200').style('background: #4f46e5 !important; color: white !important;')
 
             # --------------------
             # Footer
             # --------------------
             with ui.row().classes(
-                'w-full justify-center mt-0 pt-0 border-t border-slate-100'
+                'w-full justify-center mt-6 pt-4 border-t border-slate-100'
             ):
                 ui.label('New here?').classes(
                     'text-xs text-slate-400'
@@ -181,5 +174,5 @@ def show_login_page():
                 ui.link(
                     'Create account', '/register'
                 ).classes(
-                    f'ml-1 text-xs text-{ThemeManager.get_primary_color()} font-bold'
+                    'ml-1 text-xs text-indigo-600 font-bold hover:text-indigo-800'
                 )

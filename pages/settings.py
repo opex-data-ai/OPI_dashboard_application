@@ -45,7 +45,7 @@ async def show_settings_page():
             # --------------------
             # Profile Section
             # --------------------
-            with ui.card().classes('w-full p-0 shadow-sm border border-slate-200 rounded-lg overflow-hidden'):
+            with ui.card().classes(f'w-full p-0 {ThemeManager.get_card_style()} overflow-hidden'):
                 with ui.row().classes('w-full p-6 border-b border-slate-100 items-center justify-between'):
                     with ui.row().classes('items-center gap-4'):
                         with ui.element('div').classes('p-2 bg-slate-50 rounded-lg'):
@@ -79,7 +79,7 @@ async def show_settings_page():
             # --------------------
             # Authentication Section
             # --------------------
-            with ui.card().classes('w-full p-0 shadow-sm border border-slate-200 rounded-lg overflow-hidden'):
+            with ui.card().classes(f'w-full p-0 {ThemeManager.get_card_style()} overflow-hidden'):
                 with ui.row().classes('w-full p-6 border-b border-slate-100 items-center justify-between'):
                     with ui.row().classes('items-center gap-4'):
                         with ui.element('div').classes('p-2 bg-slate-50 rounded-lg'):
@@ -130,7 +130,7 @@ async def show_settings_page():
             # --------------------
             # Preferences & Notifications Section (Grouped)
             # --------------------
-            with ui.card().classes('w-full p-0 shadow-sm border border-slate-200 rounded-lg overflow-hidden'):
+            with ui.card().classes(f'w-full p-0 {ThemeManager.get_card_style()} overflow-hidden'):
                 with ui.row().classes('w-full p-6 border-b border-slate-100 items-center justify-between'):
                     with ui.row().classes('items-center gap-4'):
                         with ui.element('div').classes('p-2 bg-slate-50 rounded-lg'):

@@ -9,26 +9,28 @@ class ThemeManager:
     # --------------------------------------------------------------------------
     COLORS = {
         'primary': {
-            'DEFAULT': 'blue-600',  # #2563eb
-            'light': 'blue-50',     # #eff6ff
-            'dark': 'blue-800',     # #1e40af
-            'hex': '#2563eb'
+            'DEFAULT': 'indigo-500',  # #6366f1
+            'light': 'indigo-50',     # #e0e7ff
+            'dark': 'indigo-600',     # #4f46e5
+            'hex': '#6366f1'
         },
         'secondary': {
             'DEFAULT': 'slate-600', # #475569
             'light': 'slate-50',    # #f8fafc
-            'dark': 'slate-800',    # #1e293b
+            'dark': 'slate-900',    # #0f172a
             'hex': '#475569'
         },
         'accent': {
-            'success': 'emerald-600',
-            'warning': 'orange-500',
-            'danger': 'red-600',
-            'info': 'cyan-600',
-            'hex_palette': ['#2563eb', '#10b981', '#f59e0b', '#8b5cf6', '#ec4899'] # Blue, Green, Orange, Purple, Pink
+            'success': 'emerald-500',
+            'warning': 'amber-500',
+            'danger': 'red-500',
+            'info': 'violet-500',
+            'hex_palette': ['#6366f1', '#8b5cf6', '#10b981', '#f59e0b', '#ec4899'] # Indigo, Violet, Emerald, Amber, Pink
         },
         'background': {
-            'white': 'bg-white'
+            'white': 'bg-white',
+            'slate': 'bg-slate-50',
+            'dark': 'bg-slate-900'
         },
         'text': {
             'primary': 'text-slate-900',
@@ -41,12 +43,19 @@ class ThemeManager:
     # Typography
     # --------------------------------------------------------------------------
     TYPOGRAPHY = {
-        'h1': 'text-4xl font-black tracking-tight text-slate-900',
-        'h2': 'text-2xl font-bold text-slate-900',
-        'h3': 'text-xl font-bold text-slate-800',
-        'body': 'text-base text-slate-600',
-        'small': 'text-sm text-slate-500',
-        'tiny': 'text-xs text-slate-400 font-medium'
+        'h1': 'ds-h1',
+        'h2': 'ds-h2',
+        'h3': 'ds-h3',
+        'body': 'ds-body',
+        'small': 'ds-small',
+        'tiny': 'ds-tiny',
+        # Legacy aliases kept for backward compat
+        'kpi_label': 'ds-kpi-label',
+        'kpi_value': 'ds-kpi-value ds-value',
+        'kpi_sub':   'ds-kpi-sub',
+        'card_title': 'ds-card-title',
+        'card_sub':   'ds-card-sub',
+        'section':    'ds-section-label',
     }
 
     @staticmethod
@@ -66,12 +75,12 @@ class ThemeManager:
     
     @classmethod
     def get_bg_gradient(cls):
-        """Get the main background style (white)"""
-        return 'background: #ffffff;'
+        """Get the main background style (ash slate-50)"""
+        return 'background: #f8fafc;'
 
     @classmethod
     def get_card_style(cls):
         """Standard card styling"""
-        return 'border border-slate-200 shadow-sm bg-white rounded-xl'
+        return 'card-default'
 
 theme_manager = ThemeManager()

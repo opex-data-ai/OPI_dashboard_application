@@ -3,6 +3,14 @@ from nicegui import ui, app
 
 from config import FEATURES
 
+def get_abbreviation(title: str) -> str:
+    # If it's CamelCase or has spaces, take uppercase letters
+    upper_chars = [c for c in title if c.isupper()]
+    if len(upper_chars) >= 2:
+        return "".join(upper_chars[:2])
+    # Otherwise take first two letters uppercase
+    return title[:2].upper()
+
 def create_sidebar(active_page: str = ''):
     """
     Creates the navigation sidebar with menu items, dropdowns, and collapse functionality.
@@ -31,7 +39,7 @@ def create_sidebar(active_page: str = ''):
         .classes('border-r border-slate-300 p-0') \
         .style('''
             position: fixed; top: 0; left: 0; height: 100vh; overflow: hidden;
-            background: linear-gradient(180deg, #171d26 0%, #171d26 100%);
+            background: #0f172a;
             box-shadow: 4px 0 12px rgba(0, 0, 0, 0.1);
         ''') as drawer:
         
@@ -52,12 +60,12 @@ def create_sidebar(active_page: str = ''):
             header_classes = 'p-1 justify-center' if state['collapsed'] else 'p-4 gap-3 no-wrap'
             with ui.row().classes(f'items-center w-full overflow-hidden {header_classes}'):
                 if state['collapsed']:
-                    ui.image('/assets/img/epi_logo_white.png').classes('w-full h-6 object-contain m-2')
+                    ui.image('/assets/img/logo_dark.png').classes('w-full h-8 object-contain m-2')
                 else:
-                    ui.image('/assets/img/epi_logo_white.png').classes('h-8 w-18 object-contain flex-shrink-0')
+                    ui.image('/assets/img/logo_dark.png').classes('h-10 w-10 object-contain flex-shrink-0')
                     with ui.column().classes('gap-0'):
-                        ui.label('Enterprise Performance').classes('text-blue-400 font-bold tracking-wider uppercase text-[8px] leading-tight')
-                        ui.label('Intelligence').classes('text-xs font-black text-slate-200 leading-tight')
+                        ui.label('Product').classes('text-indigo-400 font-extrabold tracking-wider uppercase text-[10px] leading-tight')
+                        ui.label('Intelligence').classes('text-sm font-black text-slate-100 leading-tight')
             # Menu Section (scrollable, takes remaining space)
             with ui.scroll_area().classes('w-full p-0').style('flex: 1; overflow-y: auto; overflow-x: hidden;'):
                 
@@ -103,11 +111,12 @@ def create_sidebar(active_page: str = ''):
                         ]
                     },
                     {
-                        'title': 'AI Insights',
+                        'title': 'AI Analyst',
                         'icon': 'psychology',
                         'path': 'ai_insights',
                         'feature': 'ai_insights',
-                        'children': None
+                        'children': None,
+                        'beta': True
                     },
                     {
                         'title': 'Reports',
@@ -135,14 +144,29 @@ def create_sidebar(active_page: str = ''):
                     is_parent_active = active_page.startswith(base_path)
                     
                     if state['collapsed']:
-                        # Show only icons when collapsed
                         is_active = active_page == item['path'] or (active_page.startswith(base_path) and base_path != active_page)
                         
-                        with ui.button(icon=item['icon'], on_click=lambda p=item['path']: ui.navigate.to(f'/{p}')).props('flat').classes(
-                            'w-full py-3 rounded-none bg-white text-[#171d26] shadow-lg' if is_active else
-                            'w-full py-3 rounded-none text-white hover:bg-white/10 transition-all duration-200'
-                        ):
-                            ui.tooltip(item['title'])
+                        with ui.column().classes('w-full items-center gap-1.5 py-2'):
+                            # Render parent icon (styled consistently)
+                            with ui.button(icon=item['icon'], on_click=lambda p=item['path']: ui.navigate.to(f'/{p}')).props('flat').classes(
+                                'w-12 h-12 rounded-xl bg-indigo-500/20 text-indigo-400 border-l-[3px] border-indigo-500 shadow-md' if is_active else
+                                'w-12 h-12 rounded-xl text-white hover:bg-white/10 transition-all duration-200'
+                            ):
+                                ui.tooltip(item['title'])
+                            
+                            # Render sub-items if present
+                            if item['children']:
+                                with ui.column().classes('w-full items-center gap-2 mt-1'):
+                                    for child in item['children']:
+                                        is_child_active = active_page == child['path']
+                                        abbrev = get_abbreviation(child['title'])
+                                        
+                                        with ui.button(on_click=lambda p=child['path']: ui.navigate.to(f'/{p}')).props('flat').classes(
+                                            'w-8 h-8 rounded-full bg-indigo-500/20 text-indigo-400 border border-indigo-500/50 shadow-sm font-bold text-[9px] p-0' if is_child_active else
+                                            'w-8 h-8 rounded-full bg-white/10 text-slate-300 hover:bg-white/20 hover:text-white transition-all duration-200 text-[9px] font-bold p-0 border border-slate-700/30'
+                                        ):
+                                            ui.label(abbrev).classes('font-bold tracking-tight')
+                                            ui.tooltip(child['title'])
                     
                     elif item['children']:
                         # Item with dropdown (expanded mode)
@@ -152,7 +176,7 @@ def create_sidebar(active_page: str = ''):
                         with ui.expansion(item['title'], icon=item['icon'], value=is_expanded).classes(
                             'w-full text-white' if is_parent_active else 'w-full text-slate-300'
                         ).props('dense dark').style(
-                            'background: rgba(23, 29, 38, 0.2); border-left: 3px solid #f0f2f5; backdrop-filter: blur(10px);' if is_parent_active else
+                            'background: rgba(99, 102, 241, 0.1); border-left: 3px solid #6366f1;' if is_parent_active else
                             'background: transparent;'
                         ) as exp:
                             # CLICK HANDLER FOR NAVIGATION ON THE EXPANSION HEADER
@@ -164,7 +188,7 @@ def create_sidebar(active_page: str = ''):
                                 with ui.item(on_click=lambda p=child['path']: ui.navigate.to(f'/{p}')).classes(
                                     'w-full pl-12 py-2 rounded-lg transition-all duration-200'
                                 ).style(
-                                    'background: white; color: #171d26; transform: translateX(4px); box-shadow: 0 4px 6px rgba(0,0,0,0.1); font-weight: 600;' if is_child_active else 
+                                    'background: rgba(99, 102, 241, 0.15); color: #818cf8; font-weight: 600;' if is_child_active else 
                                     'background: rgba(255, 255, 255, 0.05); color: #cbd5e1;' if is_parent_active else
                                     'background: transparent; color: #94a3b8;'
                                 ):
@@ -179,12 +203,22 @@ def create_sidebar(active_page: str = ''):
                         with ui.item(on_click=lambda p=item['path']: ui.navigate.to(f'/{p}')).classes(
                             'w-full py-3 px-4 rounded-lg transition-all duration-200'
                         ).style(
-                            'background: white; color: #171d26; transform: translateX(4px); box-shadow: 0 4px 6px rgba(0,0,0,0.1); font-weight: 600;' if is_active else
+                            'background: rgba(99, 102, 241, 0.1); border-left: 3px solid #6366f1; color: #ffffff; font-weight: 600;' if is_active else
                             'background: transparent; color: #cbd5e1;'
                         ):
-                            with ui.row().classes('items-center gap-3'):
-                                ui.icon(item['icon']).classes('text-xl' + (' drop-shadow-lg' if is_active else ''))
-                                ui.item_label(item['title']).classes('text-sm font-medium')
+                            with ui.row().classes('w-full items-center justify-between'):
+                                with ui.row().classes('items-center gap-3'):
+                                    ui.icon(item['icon']).classes('text-xl' + (' drop-shadow-lg' if is_active else ''))
+                                    ui.item_label(item['title']).classes('text-sm font-medium')
+                                
+                                if item.get('beta'):
+                                    with ui.element('div').classes(
+                                        'px-1.5 py-0.5 rounded text-[8px] font-bold uppercase tracking-wider'
+                                    ).style(
+                                        'background: #fef3c7; color: #d97706; border: 0.5px solid #fcd34d;' if is_active else
+                                        'background: rgba(254, 243, 199, 0.15); color: #fcd34d; border: 0.5px solid rgba(252, 211, 77, 0.3);'
+                                    ):
+                                        ui.label('Beta')
 
             # Footer Section (fixed at bottom)
             ui.separator().classes('bg-slate-600/30')

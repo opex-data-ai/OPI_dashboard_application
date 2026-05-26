@@ -2,7 +2,8 @@ from nicegui import ui, app
 from datetime import datetime, timedelta
 import asyncio
 import inspect
-from typing import Callable, Optional
+from typing import Callable, Optional, List
+from components.theme_manager import ThemeManager
 
 def get_date_range_from_period(period: str):
     today = datetime.now()
@@ -48,9 +49,15 @@ def detect_period_from_dates(date_range):
     except:
         return 'Custom'
 
-def create_filter_bar(on_filter_change: Optional[Callable] = None):
+def create_filter_bar(
+    on_filter_change: Optional[Callable] = None,
+    org_options: List[str] = None,
+    current_org_val: str = None,
+    on_org_change: Optional[Callable] = None
+):
     """
     Creates a standardized filter bar that syncs with app.storage.user
+    Returns a dictionary of created elements for external visibility control.
     """
     
     # Initialize storage with default values if not present
@@ -67,7 +74,7 @@ def create_filter_bar(on_filter_change: Optional[Callable] = None):
         app.storage.user['time_period'] = 'Last 30 days'
     
     
-    with ui.row().classes('w-full items-center justify-between bg-white p-2 rounded-lg border border-slate-200'):
+    with ui.row().classes(f'w-full items-center justify-between p-2 {ThemeManager.get_card_style()}'):
         # Left side: Filter icon, label, and filter controls
         with ui.row().classes('items-center gap-4'):
             # Filter icon and label
@@ -109,18 +116,29 @@ def create_filter_bar(on_filter_change: Optional[Callable] = None):
                 value=app.storage.user.get('time_period', 'Last 30 days'),
                 on_change=on_period_change
             ).props('outlined dense rounded').classes('w-48')
+
+            # Organization Filter (Optional)
+            org_select = None
+            if org_options is not None:
+                org_select = ui.select(
+                    options=org_options,
+                    value=current_org_val,
+                    on_change=on_org_change,
+                    with_input=True,
+                    label='Organization'
+                ).props('outlined dense rounded').classes('w-64 ml-4')
             
         
         # Right side: Date range section
         current = app.storage.user['date_range']
         
-        with ui.row().classes('items-center gap-3 px-4 py-2 border border-slate-200 rounded-xl hover:bg-blue-50 cursor-pointer transition-colors group') as date_button:
-            ui.icon('calendar_today').classes('text-slate-700 text-sm group-hover:text-blue-700')
-            date_label = ui.label(f"{current['from']} - {current['to']}").classes('text-sm font-medium text-slate-700 group-hover:text-blue-700')
+        with ui.row().classes('items-center gap-3 px-4 py-2 border border-slate-200 rounded-xl hover:bg-indigo-50 cursor-pointer transition-colors group') as date_button:
+            ui.icon('calendar_today').classes('text-slate-700 text-sm group-hover:text-indigo-600')
+            date_label = ui.label(f"{current['from']} - {current['to']}").classes('text-sm font-medium text-slate-700 group-hover:text-indigo-600')
 
             with ui.menu().props('no-parent-event') as date_menu:
                 with ui.column().classes('p-2 items-center'):
-                    date_picker = ui.date(value=app.storage.user['date_range']).props('range minimal color="blue-7"')
+                    date_picker = ui.date(value=app.storage.user['date_range']).props('range minimal color="indigo"')
                     
                     def apply_date():
                         val = date_picker.value
@@ -140,6 +158,12 @@ def create_filter_bar(on_filter_change: Optional[Callable] = None):
                         date_menu.close()
                         notify_and_callback()
 
-                    ui.button('Apply', on_click=apply_date).props('unelevated color="blue-7" rounded').classes('w-full mt-2')
+                    ui.button('Apply', on_click=apply_date).props('unelevated').classes('btn-primary w-full mt-2')
 
             date_button.on('click', date_menu.open)
+        
+    return {
+        'time_select': time_select,
+        'org_select': org_select,
+        'date_container': date_button
+    }

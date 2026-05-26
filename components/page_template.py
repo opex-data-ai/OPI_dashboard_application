@@ -12,7 +12,8 @@ async def create_page_template(
     tabs: List[dict] = None,
     active_tab: str = None,
     show_filters: bool = True,
-    on_filter_change: Optional[Callable] = None
+    on_filter_change: Optional[Callable] = None,
+    org_filter_config: Optional[dict] = None
 ):
     """
     Creates a universal page template with title, filters, and tabs.
@@ -37,7 +38,19 @@ async def create_page_template(
             
         # Use shared filter component
         from components.filters import create_filter_bar
-        create_filter_bar(on_filter_change)
+        
+        org_opts = org_filter_config.get('options') if org_filter_config else None
+        curr_org = org_filter_config.get('current_val') if org_filter_config else None
+        on_org_c = org_filter_config.get('on_change') if org_filter_config else None
+
+        filter_elements = create_filter_bar(
+            on_filter_change, 
+            org_options=org_opts, 
+            current_org_val=curr_org, 
+            on_org_change=on_org_c
+        )
+        
+        org_filter_el = filter_elements.get('org_select')
 
 
     # Tabs section
@@ -60,18 +73,49 @@ async def create_page_template(
                         f'rounded-lg px-6 min-h-[32px] transition-all {text_class} {font_weight} ' + 
                         ('shadow-sm' if is_active else '')
                     )
+            
+            # Reactivity: Toggle Org Filter Visibility based on active tab
+            if org_filter_el:
+                def toggle_org_filter(e):
+                    org_filter_el.set_visibility(e.value == 'Organization Deep-Dive')
+                
+                tab_panel.on_value_change(toggle_org_filter)
+                # Initial visibility
+                org_filter_el.set_visibility(active_tab == 'Organization Deep-Dive')
 
         # Tab content panels
         with ui.tab_panels(tab_panel, value=active_tab).classes('w-full bg-transparent'):
             for tab in tabs:
                 with ui.tab_panel(tab['name']).classes('p-0 pt-4'):
-                    if 'content_func' in tab and callable(tab['content_func']):
-                        if inspect.iscoroutinefunction(tab['content_func']):
-                            await tab['content_func']()
+                    # Create an empty container placeholder
+                    tab['container'] = ui.column().classes('w-full')
+                    tab['rendered'] = False
+
+        async def render_active_tab():
+            current_tab_name = tab_panel.value
+            for tab in tabs:
+                if tab['name'] == current_tab_name and not tab['rendered']:
+                    tab['rendered'] = True
+                    with tab['container']:
+                        if 'content_func' in tab and callable(tab['content_func']):
+                            if inspect.iscoroutinefunction(tab['content_func']):
+                                await tab['content_func']()
+                            else:
+                                tab['content_func']()
                         else:
-                            tab['content_func']()
-                    else:
-                        ui.label(f'{tab["name"]} content goes here').classes(ThemeManager.TYPOGRAPHY['body'])
+                            ui.label(f'{tab["name"]} content goes here').classes(ThemeManager.TYPOGRAPHY['body'])
+
+        # Listen for tab changes to dynamically render contents on-demand (lazy load)
+        tab_panel.on_value_change(render_active_tab)
+        
+        # Initial render of the active tab on page load (safely scheduled to prevent parent slot deletion errors on page reloads)
+        async def safe_initial_render():
+            await asyncio.sleep(0.05)
+            try:
+                await render_active_tab()
+            except Exception:
+                pass
+        asyncio.create_task(safe_initial_render())
 
 
 def create_stats_row(stats: List[dict]):

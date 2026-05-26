@@ -7,7 +7,7 @@ from services.auth_service import get_db
 
 logger = logging.getLogger(__name__)
 
-def save_report_request(title, description, priority, sections, requested_by):
+def save_report_request(title, description, priority, sections, requested_by, start_date=None, end_date=None, platform=None):
     """
     Save a new report request to MongoDB.
     """
@@ -19,6 +19,9 @@ def save_report_request(title, description, priority, sections, requested_by):
             "priority": priority,
             "sections": sections,
             "requested_by": requested_by,
+            "start_date": start_date,
+            "end_date": end_date,
+            "platform": platform,
             "status": "Pending",
             "created_at": datetime.utcnow()
         }

@@ -10,8 +10,8 @@ async def show_overview_page():
 
     async def content():
         # Page header
-        ui.label(f'Welcome back, {first_name}').classes(ThemeManager.TYPOGRAPHY['h1'].replace('text-4xl', 'text-3xl') + ' mb-2')
-        ui.label("Here's what's happening across your organization today.").classes(ThemeManager.TYPOGRAPHY['body'] + ' mb-6')
+        ui.label(f'Welcome back, {first_name}').classes('ds-h1 mb-2')
+        ui.label("Here's what's happening across your organization today.").classes('ds-body mb-6')
         
         # Stats cards
         with ui.row().classes('w-full gap-4 mb-6'):
@@ -42,7 +42,7 @@ async def show_overview_page():
                                     if desc_data.get('show_ai_icon'):
                                         from components.chart_components import show_ai_insight_dialog
                                         ui.button(icon='auto_awesome', color='amber').props('flat round size=sm').classes('p-0').on('click', lambda s=stat['id']: show_ai_insight_dialog(s))
-                    ui.label(stat['value']).classes('text-3xl font-bold text-slate-900 mb-1')
+                    ui.label(stat['value']).classes('ds-value text-3xl font-bold text-slate-900 mb-1')
                     ui.label(f"{stat['change']} vs last month").classes(
                         f'text-sm {ThemeManager.COLORS["accent"]["success"]}' if '+' in stat['change'] else f'text-sm {ThemeManager.COLORS["accent"]["danger"]}'
                     )
@@ -58,14 +58,14 @@ async def show_overview_page():
                     'title': 'Product Performance', 
                     'desc': 'Track product metrics, sales analytics, and market performance', 
                     'icon': 'inventory_2', 
-                    'path': '/dashboard/product/regcomply',
+                    'path': '/product/regcomply',
                     'feature': 'product'
                 },
                 {
                     'title': 'Staff Performance', 
                     'desc': 'Monitor team productivity, project assignments, and individual KPIs', 
                     'icon': 'groups', 
-                    'path': '/dashboard/workforce/staff-performance',
+                    'path': '/people/performance',
                     'feature': 'people'
                 }
             ]
@@ -81,7 +81,7 @@ async def show_overview_page():
                         ui.label(item['title']).classes(ThemeManager.TYPOGRAPHY['h3'])
                     ui.label(item['desc']).classes(ThemeManager.TYPOGRAPHY['small'])
         
-        with ui.page_scroller(position='bottom-right', x_offset=20, y_offset=20):
-            ui.button('Scroll to Top')
+        with ui.page_scroller(position='bottom-right', x_offset=32, y_offset=32):
+            ui.button(icon='arrow_upward').props('fab-mini unelevated').classes('bg-indigo-600 text-white')
     
     await dashboard_layout(content, page_title="Overview", active_page="overview")

@@ -553,7 +553,7 @@ def send_reset_email(to_email, new_password):
         </body>
         </html>
         """
-    subject = "EPI - Password Reset"
+    subject = "OPI Hub - Password Reset"
     message = MIMEText(body, 'html')
     message['to'] = to_email
     message['subject'] = subject

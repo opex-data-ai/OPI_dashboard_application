@@ -1,5 +1,5 @@
 """
-Report Engine - Logic for assembling Excel reports from DuckDB data.
+Report Engine - Logic for assembling premium Excel reports from DuckDB using high-fidelity queries.
 """
 import io
 import logging
@@ -8,46 +8,41 @@ import pandas as pd
 from openpyxl import Workbook
 from openpyxl.utils.dataframe import dataframe_to_rows
 from data_engine.data_loader import get_data_loader
-from data_engine.query_store import (
-    ORGANIZATION_BY_PLATFORM_QUERY,
-    USER_BY_PLATFORM_QUERY,
-    ECOSYSTEM_ADOPTION_RATE_QUERY,
-    MULTIPLATFORM_ORGANIZATION_QUERY
-)
+import report_manager.report_query as rq
 
 logger = logging.getLogger(__name__)
 
-# Report Catalog - Dictionary of available reports
+# Premium Report Catalog
 REPORT_CATALOG = {
-    "kpi_summary": {
-        "title": "Platform KPI Summary",
-        "description": "High-level metrics including active orgs, users, and ecosystem adoption rates.",
-        "icon": "analytics",
-        "sheets": ["KPIs", "Adoption Rates"]
+    "exec_health": {
+        "title": "Executive Platform Health Summary",
+        "description": "Premium health indicators including cross-platform snapshot, organisation risk levels, growth trends, and audit metrics.",
+        "icon": "insights",
+        "sheets": ["Platform Snapshot", "Org Health", "User Growth Trend", "Audit Performance"]
     },
-    "user_acquisition": {
-        "title": "User Acquisition & Trends",
-        "description": "Daily tracking of active sessions, broken down by user type (signed-in vs anonymous).",
+    "sales_churn": {
+        "title": "Sales Opportunity & Churn Risk",
+        "description": "Actionable customer success metrics detailing churning risk scores, expansion upsell signals, and platform usage leaderboards.",
         "icon": "trending_up",
-        "sheets": ["Daily Trends"]
+        "sheets": ["Churn Risk", "Expansion Signals", "Org Leaderboard"]
     },
-    "geo_traffic": {
-        "title": "Geographic & Traffic Analysis",
-        "description": "Breakdown of user distribution by country and traffic source channels.",
-        "icon": "public",
-        "sheets": ["Geographic", "Traffic Sources"]
-    },
-    "module_usage": {
-        "title": "Module Usage Report",
-        "description": "Analysis of the most frequently used product modules per platform.",
+    "product_adoption": {
+        "title": "Product Feature Adoption & Module Usage",
+        "description": "Granular user experience insights detailing page/module activity levels, audit compliance funnel metrics, and user roles.",
         "icon": "view_module",
-        "sheets": ["Module Usage"]
+        "sheets": ["Module Usage", "Audit Funnel Depth", "Feature Signals", "User Roles"]
     },
-    "org_engagement": {
-        "title": "Organization Engagement",
-        "description": "Detailed engagement metrics per organization (requires proper authorization).",
-        "icon": "business",
-        "sheets": ["Org Engagement"]
+    "user_engagement": {
+        "title": "User Engagement & Retention",
+        "description": "Deep-dive engagement audit summarizing traffic source quality, geographic distribution, daily trendlines, and power-user stickiness.",
+        "icon": "public",
+        "sheets": ["Engagement KPIs", "Daily Trend", "User Segments", "Traffic Quality", "Geographic Dist"]
+    },
+    "aml_operations": {
+        "title": "RegPort Compliance Operations",
+        "description": "Specialized audit of financial transaction monitoring, sanction rule triggers, customer verification rates, and monitored account pipelines.",
+        "icon": "security",
+        "sheets": ["Transaction Summary", "Rule Performance", "Verification Activity", "Report Pipeline", "Monitored Accounts"]
     }
 }
 
@@ -55,31 +50,135 @@ class ReportEngine:
     def __init__(self):
         self.loader = get_data_loader()
 
-    def generate_excel_report(self, report_key, platform, file_path=None):
+    def generate_excel_report(self, report_key, platform, start_date, end_date, org_id=None, file_path=None):
         """
-        Generate an Excel report for a specific key and platform.
+        Generate a multi-sheet premium Excel report using high-fidelity queries.
         """
         if report_key not in REPORT_CATALOG:
             raise ValueError(f"Report key '{report_key}' not found in catalog.")
             
-        report_info = REPORT_CATALOG[report_key]
         wb = Workbook()
-        # Remove default sheet
-        wb.remove(wb.active)
+        wb.remove(wb.active)  # Remove default active sheet
         
+        # Helper to format and run the high-fidelity queries
+        def run_sheet_query(query_template):
+            # Resolve platform filter
+            plat_filter = "" if platform == "All" else f"AND platform = '{platform}'"
+            
+            # Resolve organization filter
+            org_filter = f"AND organization_id = '{org_id}'" if org_id else ""
+            
+            # Format query cleanly
+            fmt_query = query_template.format(
+                platform=platform,
+                start_date=start_date,
+                end_date=end_date,
+                platform_filter_orgs=plat_filter,
+                platform_filter_users=plat_filter,
+                platform_filter_dom=plat_filter,
+                platform_filter_dpm=plat_filter,
+                platform_filter_dum=plat_filter,
+                platform_filter_geo=plat_filter,
+                platform_filter_tsm=plat_filter,
+                org_filter_audit=org_filter,
+                org_filter_rp=org_filter
+            )
+            return self.loader.execute_query(fmt_query)
+
         try:
-            if report_key == "kpi_summary":
-                self._build_kpi_summary(wb, platform)
-            elif report_key == "user_acquisition":
-                self._build_user_acquisition(wb, platform)
-            elif report_key == "geo_traffic":
-                self._build_geo_traffic(wb, platform)
-            elif report_key == "module_usage":
-                self._build_module_usage(wb, platform)
-            elif report_key == "org_engagement":
-                self._build_org_engagement(wb, platform)
+            if report_key == "exec_health":
+                # Sheet 1: Snapshot
+                df1 = run_sheet_query(rq.EXEC_PLATFORM_SNAPSHOT)
+                self._add_df_to_sheet(wb, df1, "Platform Snapshot")
+                
+                # Sheet 2: Org Health
+                df2 = run_sheet_query(rq.EXEC_ORG_HEALTH)
+                self._add_df_to_sheet(wb, df2, "Org Health")
+                
+                # Sheet 3: User Growth
+                df3 = run_sheet_query(rq.EXEC_USER_GROWTH_TREND)
+                self._add_df_to_sheet(wb, df3, "User Growth Trend")
+                
+                # Sheet 4: RegComply Audits (RegComply/All scope only)
+                if platform in ("All", "RegComply"):
+                    df4 = run_sheet_query(rq.EXEC_AUDIT_PERFORMANCE)
+                    self._add_df_to_sheet(wb, df4, "Audit Performance")
+                    
+            elif report_key == "sales_churn":
+                # Sheet 1: Churn Risk
+                df1 = run_sheet_query(rq.SALES_CHURN_RISK)
+                self._add_df_to_sheet(wb, df1, "Churn Risk")
+                
+                # Sheet 2: Expansion
+                df2 = run_sheet_query(rq.SALES_EXPANSION_SIGNALS)
+                self._add_df_to_sheet(wb, df2, "Expansion Signals")
+                
+                # Sheet 3: Leaderboard
+                df3 = run_sheet_query(rq.SALES_ORG_LEADERBOARD)
+                self._add_df_to_sheet(wb, df3, "Org Leaderboard")
+                
+            elif report_key == "product_adoption":
+                # Sheet 1: Module Usage
+                df1 = run_sheet_query(rq.PRODUCT_MODULE_USAGE)
+                self._add_df_to_sheet(wb, df1, "Module Usage")
+                
+                # Sheet 2: Audit Funnel (RegComply/All scope only)
+                if platform in ("All", "RegComply"):
+                    df2 = run_sheet_query(rq.PRODUCT_AUDIT_FUNNEL)
+                    self._add_df_to_sheet(wb, df2, "Audit Funnel Depth")
+                    
+                # Sheet 3: Feature Signals
+                df3 = run_sheet_query(rq.PRODUCT_FEATURE_SIGNALS)
+                self._add_df_to_sheet(wb, df3, "Feature Signals")
+                
+                # Sheet 4: User Roles
+                df4 = run_sheet_query(rq.PRODUCT_USER_ROLES)
+                self._add_df_to_sheet(wb, df4, "User Roles")
+                
+            elif report_key == "user_engagement":
+                # Sheet 1: Engagement KPIs
+                df1 = run_sheet_query(rq.ENGAGEMENT_KPIS)
+                self._add_df_to_sheet(wb, df1, "Engagement KPIs")
+                
+                # Sheet 2: Daily Trend
+                df2 = run_sheet_query(rq.ENGAGEMENT_DAILY_TREND)
+                self._add_df_to_sheet(wb, df2, "Daily Trend")
+                
+                # Sheet 3: User Segments
+                df3 = run_sheet_query(rq.ENGAGEMENT_USER_SEGMENTS)
+                self._add_df_to_sheet(wb, df3, "User Segments")
+                
+                # Sheet 4: Traffic Quality
+                df4 = run_sheet_query(rq.ENGAGEMENT_TRAFFIC_QUALITY)
+                self._add_df_to_sheet(wb, df4, "Traffic Quality")
+                
+                # Sheet 5: Geo Dist
+                df5 = run_sheet_query(rq.ENGAGEMENT_GEO)
+                self._add_df_to_sheet(wb, df5, "Geographic Dist")
+                
+            elif report_key == "aml_operations":
+                # Sheet 1: Transaction Summary
+                df1 = run_sheet_query(rq.AML_TRANSACTION_SUMMARY)
+                self._add_df_to_sheet(wb, df1, "Transaction Summary")
+                
+                # Sheet 2: Rule Performance
+                df2 = run_sheet_query(rq.AML_RULE_PERFORMANCE)
+                self._add_df_to_sheet(wb, df2, "Rule Performance")
+                
+                # Sheet 3: Verification
+                df3 = run_sheet_query(rq.AML_VERIFICATION_ACTIVITY)
+                self._add_df_to_sheet(wb, df3, "Verification Activity")
+                
+                # Sheet 4: Report Pipeline
+                df4 = run_sheet_query(rq.AML_REPORT_PIPELINE)
+                self._add_df_to_sheet(wb, df4, "Report Pipeline")
+                
+                # Sheet 5: Monitored Accounts
+                df5 = run_sheet_query(rq.AML_MONITORED_ACCOUNTS)
+                self._add_df_to_sheet(wb, df5, "Monitored Accounts")
+                
             else:
-                raise NotImplementedError(f"Report logic for '{report_key}' not implemented.")
+                raise NotImplementedError(f"Report Logic for '{report_key}' is not implemented.")
 
             # Save
             if file_path:
@@ -95,8 +194,10 @@ class ReportEngine:
             raise
 
     def _add_df_to_sheet(self, wb, df, sheet_title):
-        """Helper to add a DataFrame to a new sheet in the workbook."""
+        """Helper to add a DataFrame to a new sheet in the workbook with dynamic width auto-fit."""
         ws = wb.create_sheet(title=sheet_title)
+        
+        # Ensure column headers and row values are clean
         for r in dataframe_to_rows(df, index=False, header=True):
             ws.append(r)
         
@@ -106,74 +207,12 @@ class ReportEngine:
             column_letter = column[0].column_letter
             for cell in column:
                 try:
-                    if len(str(cell.value)) > max_length:
-                        max_length = len(str(cell.value))
+                    if cell.value is not None:
+                        max_length = max(max_length, len(str(cell.value)))
                 except:
                     pass
-            adjusted_width = (max_length + 2)
-            ws.column_dimensions[column_letter].width = min(adjusted_width, 50)
-
-    def _build_kpi_summary(self, wb, platform):
-        # Query for Orgs
-        org_query = ORGANIZATION_BY_PLATFORM_QUERY
-        if platform != "All":
-            org_query = f"SELECT * FROM ({org_query}) WHERE platform = '{platform}'"
-        df_orgs = self.loader.execute_query(org_query)
-        self._add_df_to_sheet(wb, df_orgs, "KPIs")
-        
-        # Adoption Rates
-        df_adoption = self.loader.execute_query(ECOSYSTEM_ADOPTION_RATE_QUERY)
-        self._add_df_to_sheet(wb, df_adoption, "Adoption Rates")
-
-    def _build_user_acquisition(self, wb, platform):
-        query = """
-        SELECT 
-            CAST(event_date AS DATE) as date,
-            COUNT(DISTINCT CASE WHEN user_id IS NOT NULL THEN session_id END) as signed_in_sessions,
-            COUNT(DISTINCT CASE WHEN user_id IS NULL THEN session_id END) as anonymous_sessions
-        FROM sessions
-        """
-        if platform != "All":
-            query += f" WHERE platform = '{platform}'"
-        query += " GROUP BY date ORDER BY date DESC"
-        
-        df = self.loader.execute_query(query)
-        self._add_df_to_sheet(wb, df, "Daily Trends")
-
-    def _build_geo_traffic(self, wb, platform):
-        # Geo
-        geo_query = "SELECT country, COUNT(DISTINCT user_id) as users FROM all_users"
-        if platform != "All":
-            geo_query += f" WHERE platform = '{platform}'"
-        geo_query += " GROUP BY country ORDER BY users DESC"
-        df_geo = self.loader.execute_query(geo_query)
-        self._add_df_to_sheet(wb, df_geo, "Geographic")
-        
-        # Traffic
-        traffic_query = "SELECT source, medium, COUNT(*) as sessions FROM sessions"
-        if platform != "All":
-            traffic_query += f" WHERE platform = '{platform}'"
-        traffic_query += " GROUP BY source, medium ORDER BY sessions DESC"
-        df_traffic = self.loader.execute_query(traffic_query)
-        self._add_df_to_sheet(wb, df_traffic, "Traffic Sources")
-
-    def _build_module_usage(self, wb, platform):
-        query = "SELECT page_path, platform, COUNT(*) as pageviews FROM sessions"
-        if platform != "All":
-            query += f" WHERE platform = '{platform}'"
-        query += " GROUP BY page_path, platform ORDER BY pageviews DESC LIMIT 50"
-        
-        df = self.loader.execute_query(query)
-        self._add_df_to_sheet(wb, df, "Module Usage")
-
-    def _build_org_engagement(self, wb, platform):
-        query = "SELECT email_domain as organization, count(*) as session_count FROM all_organizations"
-        if platform != "All":
-            query += f" WHERE platform = '{platform}'"
-        query += " GROUP BY organization ORDER BY session_count DESC"
-        
-        df = self.loader.execute_query(query)
-        self._add_df_to_sheet(wb, df, "Org Engagement")
+            adjusted_width = (max_length + 3)
+            ws.column_dimensions[column_letter].width = min(adjusted_width, 60)
 
 _engine_instance = None
 def get_report_engine():

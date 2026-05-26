@@ -66,10 +66,18 @@ class DataLoader:
         
     def _parse_date_from_filename(self, filename: str) -> datetime:
         """
-        Extract date from filename format name_MMDDYYYY.csv
+        Extract date from filename format name_DD-MM-YYYY_page_X.csv or name_MMDDYYYY.csv
         Returns None if no valid date found.
         """
-        # Regex to find _MMDDYYYY.csv at end of string
+        # Try new format: _DD-MM-YYYY_page_X.csv or _DD-MM-YYYY.csv
+        match = re.search(r'_(\d{2}-\d{2}-\d{4})(?:_page_\d+)?\.csv$', filename)
+        if match:
+            try:
+                return datetime.strptime(match.group(1), '%d-%m-%Y')
+            except ValueError:
+                pass
+
+        # Fallback to old format: _MMDDYYYY.csv
         match = re.search(r'_(\d{8})\.csv$', filename)
         if match:
             date_str = match.group(1)
@@ -83,10 +91,17 @@ class DataLoader:
         """
         Extract base name (table name) from filename.
         e.g. user_platform_presence_01292026.csv -> user_platform_presence
+        e.g. regport_transactions_16-05-2026_page_1.csv -> regport_transactions
         """
         # Remove extension
         name_no_ext = filename.replace('.csv', '')
-        # Remove date suffix if present
+        
+        # Try new format
+        match = re.search(r'^(.*)_\d{2}-\d{2}-\d{4}(?:_page_\d+)?$', name_no_ext)
+        if match:
+            return match.group(1)
+            
+        # Fallback to old format
         match = re.search(r'^(.*)_\d{8}$', name_no_ext)
         if match:
             return match.group(1)
@@ -106,7 +121,7 @@ class DataLoader:
             logger.warning("No CSV files found in Drive folder.")
             return False
 
-        # Group files by base name
+        # Group files by base name AND date
         file_groups = {}
         for f in files:
             name = f['name']
@@ -116,51 +131,57 @@ class DataLoader:
                 
             base_name = self._get_base_name(name)
             if base_name not in file_groups:
-                file_groups[base_name] = []
+                file_groups[base_name] = {}
             
-            file_groups[base_name].append({
+            date_str = file_date.strftime('%Y%m%d')
+            if date_str not in file_groups[base_name]:
+                file_groups[base_name][date_str] = []
+                
+            file_groups[base_name][date_str].append({
                 'id': f['id'],
                 'name': name,
-                'date': file_date
+                'date': file_date,
+                'createdTime': f.get('createdTime', '')
             })
             
         current_date_obj = datetime.now()
-        # Normalize to midnight for comparison if needed, but we check date match
         
         results = {}
         
+        import pandas as pd
+        
         # Process each group
-        for base_name, group_files in file_groups.items():
-            # Sort by date descending
-            sorted_files = sorted(group_files, key=lambda x: x['date'], reverse=True)
+        for base_name, dates_dict in file_groups.items():
+            sorted_dates = sorted(dates_dict.keys(), reverse=True)
             
-            selected_file = None
+            selected_date = None
+            today_str = current_date_obj.strftime('%Y%m%d')
             
             # 1. Try to find exact match for today
-            today_str = current_date_obj.strftime('%m%d%Y')
-            for f in sorted_files:
-                if f['date'].strftime('%m%d%Y') == today_str:
-                    selected_file = f
-                    print(f"✅ Found current date file for {base_name}: {f['name']}")
-                    break
+            if today_str in dates_dict:
+                selected_date = today_str
+                print(f"✅ Found current date files for {base_name} ({len(dates_dict[today_str])} pages)")
+            # 2. Fallback to most recent
+            elif sorted_dates:
+                selected_date = sorted_dates[0]
+                logger.warning(f"Current date missing for {base_name}. Using most recent ({selected_date}) with {len(dates_dict[selected_date])} pages")
             
-            # 2. If no today file, pick the most recent previous one
-            if not selected_file and sorted_files:
-                # Since sorted descending, first one is most recent
-                # Check if it is in the past or today (future dates shouldn't happen but good to check)
-                latest = sorted_files[0]
-                if latest['date'] <= current_date_obj:
-                     selected_file = latest
-                     logger.warning(f"Current date missing for {base_name}. Using most recent: {latest['name']}")
-            
-            if selected_file:
-                # Load it
-                df = self.drive_handler.download_file_to_df(selected_file['id'], selected_file['name'])
-                if df is not None:
+            if selected_date:
+                # Download and concatenate all files for this date
+                dfs = []
+                pages = sorted(dates_dict[selected_date], key=lambda x: x['name'])
+                
+                for f in pages:
+                    df_page = self.drive_handler.download_file_to_df(f['id'], f['name'])
+                    if df_page is not None and not df_page.empty:
+                        dfs.append(df_page)
+                        
+                if dfs:
+                    df_combined = pd.concat(dfs, ignore_index=True)
                     try:
-                        self.con.register('df_view', df)
+                        self.con.register('df_view', df_combined)
                         self.con.execute(f"CREATE OR REPLACE TABLE {base_name} AS SELECT * FROM df_view")
-                        logger.info(f"Loaded table: {base_name}")
+                        logger.info(f"Loaded table: {base_name} ({len(df_combined)} total rows from {len(dfs)} pages)")
                         results[base_name] = True
                     except Exception as e:
                         logger.error(f"Error loading {base_name} into DuckDB: {e}")
@@ -209,7 +230,7 @@ class DataLoader:
         # Otherwise, force reload or cache expired
         return self.load_drive_data()
     
-    def execute_query(self, sql_query: str, params: list = None):
+    def execute_query(self, sql_query: str, params: list = None, raise_errors: bool = False):
         try:
             if not self.con:
                 self.con = duckdb.connect(str(DB_PATH))
@@ -222,10 +243,12 @@ class DataLoader:
             return result
         except Exception as e:
             logger.error(f"Query error unexpectedly encountered: {e}")
+            if raise_errors:
+                raise e
             return pd.DataFrame()
             
     
-    def execute_batch_queries(self, queries: Dict[str, str], start_date: str, end_date: str, platform: str = None) -> Dict[str, pd.DataFrame]:
+    def execute_batch_queries(self, queries: Dict[str, str], start_date: str, end_date: str, platform: str = None, org_id: str = None) -> Dict[str, pd.DataFrame]:
         """
         Execute multiple queries at once and return a dictionary of DataFrames.
         
@@ -234,6 +257,7 @@ class DataLoader:
             start_date: Start date for parameters
             end_date: End date for parameters
             platform: Optional platform filter 
+            org_id: Optional organization ID filter
             
         Returns:
             Dict[str, pd.DataFrame]: Dictionary of {name: result_dataframe}
@@ -247,7 +271,8 @@ class DataLoader:
             'queries': queries,
             'start_date': start_date,
             'end_date': end_date,
-            'platform': platform
+            'platform': platform,
+            'org_id': org_id
         }, sort_keys=True)
         cache_key = hashlib.md5(cache_key_raw.encode()).hexdigest()
         
@@ -266,9 +291,12 @@ class DataLoader:
                 # Calculate params count
                 param_count = sql.count('?')
                 
-                # Logic: We usually have groups of 2 (start, end) or 3 (start, end, platform)
-                # If platform is provided and there are 3 ? in the first WITH vars clause, or multiple of 3
-                if platform and (param_count % 3 == 0):
+                # Check for special organization deep dive queries
+                if org_id and param_count == 1:
+                    params = [org_id]
+                elif org_id and param_count == 2 and platform:
+                    params = [org_id, platform]
+                elif platform and (param_count % 3 == 0):
                     params = [start_date, end_date, platform] * (param_count // 3)
                 else:
                     # Fallback to existing [start, end] pairs

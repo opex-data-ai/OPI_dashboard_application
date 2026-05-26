@@ -11,7 +11,7 @@ from pages.overview import show_overview_page
 from pages.register import show_register_page
 from pages.forgot_password import show_forgot_page
 from pages.change_password import show_change_password_page
-from pages.landing import show_landing_page
+
 from pages.product.regwatch import show_regwatch_product_page
 from pages.product.regcomply import show_regcomply_product_page
 from pages.product.regport import show_regport_product_page
@@ -29,7 +29,9 @@ from components.dashboard_layout import dashboard_layout
 from dotenv import load_dotenv
 load_dotenv()
 
-# Configure structured logging
+
+
+# Configure structured logging - trigger reload
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s [%(levelname)s] %(name)s: %(message)s',
@@ -123,6 +125,276 @@ ui.add_head_html('''
         
         .q-drawer .q-scrollarea__content::-webkit-scrollbar-thumb:hover {
             background: rgba(255, 255, 255, 0.3);
+        }
+    </style>
+''', shared=True)
+
+# ── Global Font & Design System ───────────────────────────────────────────
+# Three-font hierarchy:
+#   DM Sans         → Navigation chrome: sidebar, header bar, tab titles
+#   Sora            → Page content: headings, card labels, body text
+#   IBM Plex Mono   → Data values: KPI numbers, IDs, dates, table values
+ui.add_head_html('''
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500&family=DM+Mono:wght@400;500&family=IBM+Plex+Mono:wght@400;500;600&family=Sora:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        /* ════════════════════════════════════════════════════════════════
+           OPEX PI HUB — GLOBAL DESIGN SYSTEM
+           Font roles:
+             --nav-font  DM Sans    → Sidebar, header bar, tab labels
+             --ds-font   Sora       → Page content, cards, headings
+             --ds-mono   IBM Plex Mono → KPI numbers, data, IDs, dates
+           ════════════════════════════════════════════════════════════════ */
+
+        :root {
+            --nav-font: "DM Sans",  system-ui, sans-serif;
+            --ds-font:  "Sora",     system-ui, -apple-system, sans-serif;
+            --ds-mono:  "IBM Plex Mono", "DM Mono", monospace;
+            --ds-text1: #0f172a;
+            --ds-text2: #475569;
+            --ds-text3: #64748b;
+        }
+
+        /* ── 1. Content base — Sora for all page content (no !important) ── */
+        html, body {
+            font-family: var(--ds-font);
+            -webkit-font-smoothing: antialiased;
+            color: var(--ds-text1);
+        }
+
+        /* ── 2. NAVIGATION CHROME — DM Sans ── */
+        /* Sidebar drawer & popup dropdown menus */
+        .q-drawer,
+        .q-drawer .q-item,
+        .q-drawer .q-item__label,
+        .q-drawer .q-expansion-item,
+        .q-drawer .q-expansion-item__content,
+        .q-drawer .q-item__section,
+        .q-drawer .q-btn,
+        .q-drawer .q-btn__content,
+        .q-menu,
+        .q-menu .q-item,
+        .q-menu .q-item__label {
+            font-family: var(--nav-font) !important;
+        }
+        /* Sidebar parent nav items: medium weight, slightly spaced */
+        .q-drawer .q-item__label--header,
+        .q-drawer .q-expansion-item > .q-item .q-item__label {
+            font-size: 13px !important;
+            font-weight: 500 !important;
+            letter-spacing: 0.01em !important;
+        }
+        /* Sidebar child items: lighter, smaller */
+        .q-drawer .q-expansion-item__content .q-item__label {
+            font-size: 12px !important;
+            font-weight: 400 !important;
+            letter-spacing: 0.005em !important;
+        }
+        /* Simple (non-dropdown) sidebar items */
+        .q-drawer .q-item > .q-item__section--main .q-item__label {
+            font-size: 13px !important;
+            font-weight: 400 !important;
+        }
+        /* Sidebar brand label */
+        .q-drawer .sidebar-brand-label {
+            font-family: var(--nav-font) !important;
+            font-size: 8px !important;
+            font-weight: 500 !important;
+            letter-spacing: 0.12em !important;
+            text-transform: uppercase !important;
+        }
+
+        /* Header bar */
+        .q-header,
+        .q-header .q-btn,
+        .q-header .q-btn__content,
+        .q-header label,
+        .q-header span {
+            font-family: var(--nav-font) !important;
+        }
+        /* Header page title — DM Sans bold */
+        .q-header .ds-h2 {
+            font-family: var(--nav-font) !important;
+            font-size: 20px !important;
+            font-weight: 500 !important;
+            letter-spacing: -0.01em !important;
+            color: var(--ds-text1) !important;
+        }
+        /* Header user name */
+        .q-header .nav-username {
+            font-family: var(--nav-font) !important;
+            font-size: 13px !important;
+            font-weight: 500 !important;
+        }
+        /* Header user role */
+        .q-header .nav-role {
+            font-family: var(--nav-font) !important;
+            font-size: 11px !important;
+            font-weight: 300 !important;
+            color: var(--ds-text3) !important;
+        }
+
+        /* Tab bars (Quasar q-tabs) */
+        .q-tabs,
+        .q-tab,
+        .q-tab__label {
+            font-family: var(--nav-font) !important;
+            font-size: 12px !important;
+            font-weight: 500 !important;
+            letter-spacing: 0.02em !important;
+        }
+        .q-tab--active .q-tab__label {
+            font-weight: 600 !important;
+        }
+
+        /* ── 3. DATA VALUES — IBM Plex Mono ── */
+        .ds-value, .rp-kpi-value, .ds-kpi-value {
+            font-family: var(--ds-mono) !important;
+            font-variant-numeric: tabular-nums;
+            letter-spacing: -0.03em;
+        }
+        .ds-mono, .rp-mono-cell {
+            font-family: var(--ds-mono) !important;
+            font-size: 11px;
+            letter-spacing: -0.01em;
+        }
+
+        /* ── 4. CONTENT TYPOGRAPHY — Sora ── */
+
+        /* Page headings */
+        .ds-h1 { font-size: 26px; font-weight: 700; color: var(--ds-text1); letter-spacing: -0.02em; line-height: 1.2; }
+        .ds-h2 { font-size: 20px; font-weight: 600; color: var(--ds-text1); letter-spacing: -0.01em; }
+        .ds-h3 { font-size: 15px; font-weight: 600; color: var(--ds-text1); }
+
+        /* Section dividers */
+        .ds-section-label, .rp-section-label {
+            font-size: 10px; font-weight: 500;
+            letter-spacing: 0.09em; text-transform: uppercase;
+            color: var(--ds-text3);
+        }
+
+        /* Card titles & subtitles */
+        .ds-card-title, .rp-card-title {
+            font-size: 13px; font-weight: 600;
+            color: var(--ds-text1); letter-spacing: -0.01em;
+        }
+        .ds-card-sub, .rp-card-sub {
+            font-size: 10px; font-weight: 400; color: var(--ds-text3);
+        }
+
+        /* KPI labels */
+        .ds-kpi-label, .rp-kpi-label {
+            font-size: 9px; font-weight: 500;
+            letter-spacing: 0.07em; text-transform: uppercase;
+            color: var(--ds-text3);
+        }
+        /* KPI large numbers — Mono */
+        .ds-kpi-value, .rp-kpi-value {
+            font-family: var(--ds-mono) !important;
+            font-size: 22px; font-weight: 600;
+            color: var(--ds-text1); letter-spacing: -0.03em; line-height: 1;
+        }
+        /* KPI sub-label */
+        .ds-kpi-sub, .rp-kpi-sub {
+            font-size: 10px; color: var(--ds-text3);
+        }
+
+        /* Body text */
+        .ds-body  { font-size: 13px; color: var(--ds-text2); line-height: 1.6; }
+        .ds-small { font-size: 11px; color: var(--ds-text3); }
+        .ds-tiny  { font-size: 10px; color: var(--ds-text3); letter-spacing: 0.01em; }
+
+        /* Org header labels */
+        .rp-org-name      { font-size: 18px; font-weight: 600; color: var(--ds-text1); letter-spacing: -0.01em; }
+        .rp-org-meta      { font-size: 12px; font-weight: 400; color: var(--ds-text2); }
+        .rp-org-meta-bold { font-size: 12px; font-weight: 600; color: var(--ds-text1); }
+
+        /* ── 5. Table typography ── */
+        .q-table th {
+            font-family: var(--nav-font) !important;
+            font-size: 10px !important;
+            font-weight: 500 !important;
+            letter-spacing: 0.07em !important;
+            text-transform: uppercase !important;
+            color: var(--ds-text3) !important;
+        }
+        .q-table td {
+            font-family: var(--ds-font) !important;
+            font-size: 12px !important;
+            color: var(--ds-text2) !important;
+        }
+
+        /* ── 6. Global thin scrollbar ── */
+        ::-webkit-scrollbar { width: 4px; height: 4px; }
+        ::-webkit-scrollbar-track { background: #f1f5f9; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 2px; }
+
+        /* ── 7. Global Component Tokens (Cards & Buttons) ── */
+        .card-default {
+            background-color: #ffffff !important;
+            border: 1px solid rgba(226, 232, 240, 0.8) !important;
+            border-radius: 16px !important;
+            box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05) !important;
+        }
+        .card-elevated {
+            background-color: #ffffff !important;
+            border-radius: 16px !important;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06) !important;
+            border: 0 !important;
+        }
+        .card-glass {
+            background-color: rgba(255, 255, 255, 0.8) !important;
+            backdrop-filter: blur(12px) !important;
+            border: 1px solid rgba(241, 245, 249, 0.8) !important;
+            border-radius: 16px !important;
+            box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05) !important;
+        }
+
+        .btn-primary {
+            background-color: #6366f1 !important;
+            color: #ffffff !important;
+            border-radius: 12px !important;
+            font-weight: 600 !important;
+            text-transform: none !important;
+            box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05) !important;
+            transition: all 0.2s ease !important;
+        }
+        .btn-primary:hover {
+            background-color: #4f46e5 !important;
+        }
+        .btn-secondary {
+            background-color: #f1f5f9 !important;
+            color: #334155 !important;
+            border-radius: 12px !important;
+            font-weight: 600 !important;
+            text-transform: none !important;
+            transition: all 0.2s ease !important;
+        }
+        .btn-secondary:hover {
+            background-color: #e2e8f0 !important;
+        }
+        .btn-ghost {
+            background-color: transparent !important;
+            border: 1px solid #e2e8f0 !important;
+            color: #334155 !important;
+            border-radius: 12px !important;
+            text-transform: none !important;
+            transition: all 0.2s ease !important;
+        }
+        .btn-ghost:hover {
+            background-color: #f8fafc !important;
+        }
+        .btn-danger {
+            background-color: #ef4444 !important;
+            color: #ffffff !important;
+            border-radius: 12px !important;
+            font-weight: 600 !important;
+            text-transform: none !important;
+            transition: all 0.2s ease !important;
+        }
+        .btn-danger:hover {
+            background-color: #dc2626 !important;
         }
     </style>
 ''', shared=True)
@@ -232,65 +504,65 @@ async def google_callback(request: Request):
     ui.notify(f'Welcome, {user_data["first_name"]}!', color='green')
     ui.navigate.to('/overview')
 
-@ui.page('/', title='Opex Consulting Dashboard', favicon='💼')
-def landing_page():
-    show_landing_page()
+@ui.page('/', title='Opex Product Intelligence Hub', favicon='assets/favicon.ico')
+def root_page():
+    ui.navigate.to('/login')
 
 
-@ui.page('/login')
+@ui.page('/login', title='Opex Product Intelligence Hub')
 def login_page():
     show_login_page()
 
 
-@ui.page('/register')
+@ui.page('/register', title='Opex Product Intelligence Hub')
 def register_page():
     show_register_page()
 
 
-@ui.page('/forgot')
+@ui.page('/forgot', title='Opex Product Intelligence Hub')
 def forgot_page():
     show_forgot_page()
 
 
-@ui.page('/change_password')
+@ui.page('/change_password', title='Opex Product Intelligence Hub')
 def change_password_page(request: Request):
     email = request.query_params.get('email')
     show_change_password_page(email)
 
 
-@ui.page('/overview')
+@ui.page('/overview', title='Opex Product Intelligence Hub')
 async def overview_page():
     await show_overview_page()
 
-@ui.page('/product/regcomply')
+@ui.page('/product/regcomply', title='Opex Product Intelligence Hub')
 async def regcomply_page():
     await show_regcomply_product_page()
 
-@ui.page('/product/regport')
+@ui.page('/product/regport', title='Opex Product Intelligence Hub')
 async def regport_page():
     await show_regport_product_page()
 
-@ui.page('/product/regwatch')
+@ui.page('/product/regwatch', title='Opex Product Intelligence Hub')
 async def regwatch_page():
     await show_regwatch_product_page()
 
-@ui.page('/product/home')
+@ui.page('/product/home', title='Opex Product Intelligence Hub')
 async def product_home_page():
     await show_product_home_page()
 
-@ui.page('/project/project')
+@ui.page('/project/project', title='Opex Product Intelligence Hub')
 async def project_page():
     await show_projects_page()
 
-@ui.page('/project/task')
+@ui.page('/project/task', title='Opex Product Intelligence Hub')
 async def task_page():
     await show_tasks_page()
 
-@ui.page('/people/utilization')
+@ui.page('/people/utilization', title='Opex Product Intelligence Hub')
 async def utilization_page():
     await show_utilization_page()
 
-@ui.page('/people/performance')
+@ui.page('/people/performance', title='Opex Product Intelligence Hub')
 async def performance_page(): 
     await show_performance_page()
 
@@ -307,15 +579,15 @@ async def people_redirect():
 async def project_redirect():
     ui.navigate.to('/project/project')
 
-@ui.page('/settings')
+@ui.page('/settings', title='Opex Product Intelligence Hub')
 async def settings_page():
     await show_settings_page()
 
-@ui.page('/ai_insights')
+@ui.page('/ai_insights', title='Opex Product Intelligence Hub')
 async def ai_insights_page():
     await show_ai_insights_page()
 
-@ui.page('/reports')
+@ui.page('/reports', title='Opex Product Intelligence Hub')
 async def reports_page(): 
     await show_reports_page()
 
@@ -350,6 +622,9 @@ async def load_data():
     # Load Drive data into DuckDB
     try:
         loader = get_data_loader()
+        
+
+
         result = loader.load_all_data()
         
         # Report what tables were loaded
@@ -387,5 +662,6 @@ ui.run(
     host='0.0.0.0',
     port=8080,
     storage_secret=STORAGE_SECRET,
+    favicon='assets/favicon.ico',
     reload=True
 )

@@ -1,6 +1,8 @@
 """
-AI Chat Assistant — V1
+AI Chat Assistant — V3 (Metric-Aware with Self-Correction & Polite Fallbacks)
 Converts natural-language questions into SQL, queries DuckDB, and returns answers.
+Uses predefined SQL templates for common queries, validates SQL execution,
+self-corrects syntax/binder errors using LLM, and provides premium executive fallbacks.
 """
 from google import genai
 import os
@@ -10,6 +12,7 @@ import json
 from typing import Dict, Any, Optional, List
 from utils.anonymizer import anonymize_data, restore_pii
 from data_engine.sheets_handler import get_sheets_handler
+from data_engine.chart_descriptions import METRIC_INFO
 
 logger = logging.getLogger(__name__)
 
@@ -17,18 +20,51 @@ logger = logging.getLogger(__name__)
 client = genai.Client(api_key=os.environ.get("GEMINI_API_KEY"))
 
 # ─── PII Configuration ───────────────────────────────────────────
-# Common PII column names found in the database/metadata
 PII_COLUMNS = ['organizationName', 'user_id', 'email', 'user_pseudo_id', 'organization_id']
+
+# ─── Standard Reference SQL Templates ────────────────────────────
+STANDARD_TEMPLATES = """
+Below are mathematically correct reference SQL queries for common dashboard questions.
+Always use these exact patterns and tables when answering relevant questions:
+
+1. User count / user base by platform:
+SELECT platform, COUNT(DISTINCT user_id) AS total_users FROM all_users GROUP BY platform;
+
+2. Organisation count / tracking count by platform:
+SELECT platform, COUNT(DISTINCT email_domain) AS total_orgs FROM all_organizations GROUP BY platform;
+
+3. Ecosystem / Multi-platform adoption (organisations using > 1 platform):
+WITH org_platforms AS (
+  SELECT email_domain, COUNT(DISTINCT platform) AS platform_count FROM all_organizations GROUP BY email_domain
+)
+SELECT 
+  COUNTIF(platform_count > 1) AS multi_platform_orgs_count, 
+  COUNT(*) AS total_orgs, 
+  COUNTIF(platform_count > 1) / COUNT(*) AS multi_platform_adoption_rate 
+FROM org_platforms;
+
+4. Monthly active users/growth trend (Uses safe strftime date casting):
+SELECT 
+  platform, 
+  strftime(CAST(date AS DATE), '%Y-%m') AS month, 
+  COUNT(DISTINCT user_id) AS active_users 
+FROM daily_user_metrics 
+GROUP BY platform, month 
+ORDER BY platform, month;
+
+5. Active organizations by platform:
+SELECT platform, COUNT(DISTINCT organization_id) AS active_orgs FROM daily_organization_metrics GROUP BY platform;
+
+6. Top active organizations by user count:
+SELECT platform, organization_id, COUNT(DISTINCT user_id) AS user_count FROM daily_user_metrics GROUP BY platform, organization_id ORDER BY user_count DESC LIMIT 10;
+""".strip()
 
 # ─── Schema Cache ────────────────────────────────────────────────
 _schema_cache: Optional[str] = None
 
 
 def get_schema_context() -> str:
-    """
-    Query DuckDB for all table names and their column schemas.
-    Caches the result for the lifetime of the process.
-    """
+    """Query DuckDB for all table names and their column schemas. Cached."""
     global _schema_cache
     if _schema_cache:
         return _schema_cache
@@ -41,11 +77,11 @@ def get_schema_context() -> str:
         schema_parts = []
         for (table_name,) in tables:
             if table_name.startswith('_'):
-                continue  # skip internal metadata tables
+                continue
             cols = loader.con.execute(f"DESCRIBE {table_name}").fetchall()
             col_descs = ", ".join([f"{c[0]} ({c[1]})" for c in cols])
             schema_parts.append(f"  • {table_name}: {col_descs}")
-        
+
         _schema_cache = "\n".join(schema_parts)
         logger.info(f"Schema context built: {len(schema_parts)} tables discovered.")
         return _schema_cache
@@ -54,12 +90,27 @@ def get_schema_context() -> str:
         return "(schema unavailable)"
 
 
+def get_standard_metrics_context() -> str:
+    """Build a compact list of official dashboard metrics and calculation rules for the LLM."""
+    try:
+        lines = []
+        for key, info in METRIC_INFO.items():
+            title = info.get('title', key)
+            desc = info.get('description', '')
+            schema_exp = info.get('schema_explanation', '')
+            chart_data = info.get('chart_data')
+            lines.append(f"  • {key}: {title} — {desc} (Calculation Guide: {schema_exp}, Query Key: {chart_data})")
+        return "\n".join(lines)
+    except Exception as e:
+        logger.error(f"Failed to build standard metrics context: {e}")
+        return "(no standard metrics metadata)"
+
+
 def _extract_sql(text: str) -> Optional[str]:
     """Extract SQL from a code-fenced response."""
     match = re.search(r"```sql\s*(.*?)\s*```", text, re.DOTALL | re.IGNORECASE)
     if match:
         return match.group(1).strip()
-    # Fallback: if the entire response looks like SQL
     stripped = text.strip()
     if stripped.upper().startswith("SELECT"):
         return stripped
@@ -77,64 +128,83 @@ def _is_safe_sql(sql: str) -> bool:
     return True
 
 
-def ask(question: str) -> Dict[str, Any]:
+def ask(question: str, conversation_context: str = "") -> Dict[str, Any]:
     """
-    Main entry point: NLP question → SQL → DuckDB query → natural-language answer.
-    
-    Returns:
-        {
-            "answer": str,          # Natural-language summary
-            "sql": str | None,      # The generated SQL
-            "data": list[dict] | None,  # Up to 20 result rows
-            "error": str | None     # Error message if something failed
-        }
+    Main entry point: NLP question → SQL (with reference templates + self-correction) 
+    → DuckDB query → natural-language answer.
     """
-    logger.info(f"Chat assistant received question: '{question[:80]}...'")
-    
+    logger.info(f"Chat assistant V3 received question: '{question[:80]}...'")
+
     schema = get_schema_context()
-    
+    metrics_context = get_standard_metrics_context()
+
+    # Build conversation history block
+    history_block = ""
+    if conversation_context and conversation_context.strip():
+        history_block = (
+            "Prior conversation (resolve pronouns / references like "
+            "\"it\", \"that platform\", \"its trend\" against this history):\n"
+            + conversation_context
+        )
+
     # ── Step 1: Generate SQL ──────────────────────────────────────
     sql_prompt = f"""
-You are a data analyst assistant. You have access to a DuckDB database with the following tables and columns:
+You are a senior data analyst for a RegTech SaaS platform dashboard called "AI Analyst".
+You have access to a DuckDB database with these tables and columns:
 
 {schema}
 
-The user asks a question in plain English. Your job:
-1. Write a single SQL SELECT query that answers the question.
-2. Wrap the SQL in a ```sql``` code fence.
-3. After the SQL, write a one-sentence explanation of what the query does.
+Official Dashboard Metrics and Calculation Rules:
+{metrics_context}
+
+{STANDARD_TEMPLATES}
+
+{history_block}
+
+Current question: {question}
+
+Instructions:
+1. Using the conversation history (if any), resolve references to previous answers.
+2. Write a single SQL SELECT query that answers the current question. Use standard reference templates and calculations when applicable.
+3. Wrap the SQL in a ```sql``` code fence.
+4. If the question matches one of the standard dashboard metrics listed above, include a line at the very end of your response:
+   METRIC_KEY: [insert_matching_key_here]
+   (e.g., METRIC_KEY: user_breakdown)
+5. After the SQL, write one sentence explaining what the query does.
 
 Rules:
-- Only use SELECT statements. Never write INSERT, UPDATE, DELETE, DROP, etc.
+- Only SELECT statements — never INSERT, UPDATE, DELETE, DROP, etc.
 - Only reference tables and columns listed above.
 - Use DuckDB SQL dialect.
-- If the question cannot be answered with the available tables, say so clearly and do not generate SQL.
-- Keep queries simple and efficient.
-
-User question: {question}
+- For any monthly or date groupings, format date types safely. E.g. use strftime(CAST(col AS DATE), '%Y-%m') instead of strftime('%Y-%m', col).
+- If the question cannot be answered with the available data, say so clearly without generating SQL.
 """.strip()
 
     try:
-        logger.debug("Sending question to LLM for SQL generation...")
+        logger.debug("Generating SQL query using LLM...")
         sql_response = client.models.generate_content(
             model="gemini-2.0-flash",
             contents=sql_prompt
         )
         raw_response = sql_response.text.strip()
-        logger.debug(f"LLM SQL response received ({len(raw_response)} chars)")
-        
         sql = _extract_sql(raw_response)
-        
+
+        # Parse matching METRIC_KEY from the generated response
+        metric_key = None
+        metric_match = re.search(r"METRIC_KEY:\s*([a-zA-Z0-9_]+)", raw_response, re.IGNORECASE)
+        if metric_match:
+            metric_key = metric_match.group(1).strip()
+            logger.info(f"Standard dashboard metric key identified: {metric_key}")
+
         if not sql:
-            # The LLM couldn't generate SQL — return its explanation directly
-            logger.info("No SQL generated by LLM — returning explanation.")
+            # If LLM didn't formulate SQL, return its raw conversational answer
             return {
                 "answer": raw_response.replace("```", "").strip(),
                 "sql": None,
                 "data": None,
                 "error": None
             }
-        
+
         if not _is_safe_sql(sql):
             return {
                 "answer": "I can only run read-only queries. Your request appears to modify data, which I cannot do.",
@@ -142,54 +212,143 @@ User question: {question}
                 "data": None,
                 "error": "Blocked: non-SELECT SQL detected."
             }
-        
-        # ── Step 2: Execute SQL ───────────────────────────────────
-        logger.info(f"Executing generated SQL: {sql[:120]}...")
+
+        # ── Step 2: Safe SQL Execution & Validation Layer ─────────
         from data_engine.data_loader import get_data_loader
         loader = get_data_loader()
-        
-        df = loader.execute_query(sql)
-        
-        if df is None or df.empty:
+
+        df = None
+        execution_error = None
+
+        try:
+            df = loader.execute_query(sql, raise_errors=True)
+        except Exception as query_err:
+            execution_error = str(query_err)
+            logger.warning(f"Initial SQL query failed: {execution_error}. Attempting Self-Correction...")
+
+            # ── Step 2.5: SQL Self-Correction Pass ─────────────────
+            correction_prompt = f"""
+You are a senior DuckDB SQL expert.
+You wrote this SQL query for the user's question, but it threw a database execution error:
+
+Question: {question}
+SQL Generated:
+```sql
+{sql}
+```
+
+Database Error:
+{execution_error}
+
+Table schemas available:
+{schema}
+
+Instructions:
+1. Fix the error in the SQL query. 
+2. Ensure you cast string dates properly, e.g. strftime(CAST(date_column AS DATE), '%Y-%m') or cast(date_column as DATE).
+3. Output ONLY a corrected SQL statement inside a single ```sql ``` block. No explanation.
+""".strip()
+
+            try:
+                correction_response = client.models.generate_content(
+                    model="gemini-2.0-flash",
+                    contents=correction_prompt
+                )
+                corrected_sql = _extract_sql(correction_response.text.strip())
+
+                if corrected_sql and corrected_sql != sql:
+                    logger.info(f"Executing corrected SQL query: {corrected_sql[:120]}...")
+                    df = loader.execute_query(corrected_sql, raise_errors=True)
+                    sql = corrected_sql  # Update with successfully corrected SQL
+                    execution_error = None  # Clear error
+                else:
+                    raise Exception("Correction produced identical SQL or failed to parse.")
+            except Exception as correction_err:
+                logger.error(f"SQL Self-Correction failed: {correction_err}")
+                execution_error = f"Original error: {execution_error}. Correction error: {correction_err}"
+
+        # ── Step 2.6: Polite Executive Fallback ───────────────────
+        if execution_error or df is None or df.empty:
+            logger.warning("No data retrieved or SQL is invalid. Generating polite executive response...")
+            
+            polite_prompt = f"""
+You are "AI Analyst", a professional product and sales intelligence assistant.
+The user asked: "{question}"
+We were unable to successfully fetch dynamic metrics from the backend database for this query.
+
+Table schemas available:
+{schema}
+
+Instructions:
+1. Write a polite, premium, executive-level response explaining that we couldn't compile the exact figures for their specific query layout (avoid technical jargon like "SQL", "database", "DuckDB", "syntax error").
+2. Describe what relevant data we DO track (e.g. users, organisations, engagement metrics by platform) in a reassuring way.
+3. Suggest 2-3 clean, alternative questions they can ask instead, like:
+   - "How many platforms are we tracking?"
+   - "Show me the user base size by platform."
+   - "Which platform has the highest active organisation count?"
+4. Keep the tone extremely professional, helpful, and concise. No headers or bullet points.
+""".strip()
+
+            fallback_response = client.models.generate_content(
+                model="gemini-2.0-flash",
+                contents=polite_prompt
+            )
             return {
-                "answer": "The query returned no results. Try rephrasing your question or checking if data is available.",
-                "sql": sql,
+                "answer": fallback_response.text.strip(),
+                "sql": sql if sql else None,
                 "data": None,
-                "error": None
+                "error": execution_error or "Query returned no results."
             }
-        
-        # Limit rows for display and LLM summarization
+
+        # ── Step 3: Summarise Working Results ────────────────────
         row_count = len(df)
         display_df = df.head(20)
-        
-        # ── Step 2.5: PII Protection ─────────────────────────────
-        # Convert to records for checking PII
         data_for_display = display_df.to_dict(orient='records')
-        
-        # Check if the result contains any PII columns
+
+        # PII Protection
         found_pii = [col for col in display_df.columns if col in PII_COLUMNS]
         pii_mapping = {}
-        
+
         if found_pii:
-            logger.info(f"PII columns detected in query result: {found_pii}. Anonymizing.")
+            logger.info(f"PII columns detected: {found_pii}. Anonymizing.")
             anonymized_records, pii_mapping = anonymize_data(data_for_display, found_pii)
-            # Use anonymized records for the LLM summary
             summary_data_text = json.dumps(anonymized_records, indent=1)
         else:
             summary_data_text = display_df.to_string(index=False)
 
-        logger.info(f"Query returned {row_count} rows. Sending top {len(display_df)} to LLM for summary.")
-        
-        # ── Step 3: Summarize results ────────────────────────────
-        summary_prompt = f"""
-You are a helpful data analyst. The user asked: "{question}"
+        # Fetch matching metric info from chart_descriptions.py if matched
+        metric_info_block = ""
+        if metric_key and metric_key in METRIC_INFO:
+            info = METRIC_INFO[metric_key]
+            metric_info_block = f"""
+Official Dashboard Metric Definition:
+- Title: {info.get('title')}
+- Description: {info.get('description')}
+- Calculation Detail: {info.get('schema_explanation')}
+Use this official metric description and calculation rationale to ensure your analysis perfectly matches the dashboard's design.
+"""
 
-The SQL query returned the following data ({row_count} total rows, showing top {len(display_df)}):
+        logger.info(f"Query succeeded. Row count: {row_count}. Generating analyst summary...")
+
+        summary_prompt = f"""
+You are "AI Analyst", a strategic product and business intelligence assistant for a RegTech SaaS platform.
+Your audience is product managers, sales reps, business development leaders, and senior executives.
+
+{metric_info_block}
+
+{history_block}
+
+Current question: "{question}"
+
+Data returned ({row_count} total rows, top {len(display_df)} shown):
 {summary_data_text}
 
-Write a concise, plain-English answer (2-4 sentences max) that directly answers the user's question based on this data. 
-Be specific with numbers. Do not use markdown formatting. Do not mention SQL or databases.
-**Privacy Notice**: If you see values starting with "HIDDEN_", these are anonymized unique identifiers. Refer to them naturally as "Organization [Identifier]" or similar.
+Instructions:
+1. Write a concise, plain-English response (2–4 sentences) that directly answers the current question using conversation history for context.
+2. Focus on strategic business insights — growth signals, adoption patterns, engagement trends, commercial opportunities, action items.
+3. Avoid commenting on data structure or completeness. If a genuine data quality issue would distort the insight, mention it briefly in passing.
+4. Be specific with numbers. No markdown, headers, or bullet points. Never mention SQL or databases.
+5. If you see values starting with "HIDDEN_", they are anonymised identifiers — refer to them as "Organisation [ID]" or similar.
 """.strip()
 
         summary_response = client.models.generate_content(
@@ -197,20 +356,19 @@ Be specific with numbers. Do not use markdown formatting. Do not mention SQL or 
             contents=summary_prompt
         )
         answer = summary_response.text.strip()
-        
-        # ── Step 4: Final Restoration & Logging ─────────────────
-        # Restore PII in the natural language answer
+
+        # Restore PII hashes in response
         if pii_mapping:
-            logger.info("Restoring hashes in AI natural language answer.")
+            logger.info("Restoring PII hashes in AI answer.")
             answer = restore_pii(answer, pii_mapping)
-        
+
+        # Log Interaction
         tokens_used = 0
         try:
-             tokens_used = summary_response.usage_metadata.total_token_count
-        except:
-             pass
+            tokens_used = summary_response.usage_metadata.total_token_count
+        except Exception:
+            pass
 
-        # Log to Google Sheets
         try:
             sheets = get_sheets_handler()
             sheets.log_interaction(
@@ -223,17 +381,15 @@ Be specific with numbers. Do not use markdown formatting. Do not mention SQL or 
         except Exception as sheet_err:
             logger.error(f"Failed to log to Google Sheets: {sheet_err}")
 
-        logger.debug("Summary generated and logged successfully.")
-        
         return {
             "answer": answer,
             "sql": sql,
             "data": data_for_display,
             "error": None
         }
-        
+
     except Exception as e:
-        logger.error(f"Chat assistant error: {e}")
+        logger.error(f"Chat assistant critical exception: {e}")
         return {
             "answer": "I encountered an error processing your question. Please try again.",
             "sql": None,

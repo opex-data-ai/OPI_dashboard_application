@@ -85,4 +85,5 @@ DATA_FILES = {
 DATE_FORMAT = '%m%d%Y'  # e.g., 01142026
 
 # Cache settings
-CACHE_DURATION_MINUTES = 30  # How long to cache data before refresh
+CACHE_DURATION_MINUTES = 60*8
+# How long to cache data before refresh

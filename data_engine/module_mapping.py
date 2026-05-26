@@ -46,15 +46,15 @@ PLATFORM_MODULE_MAPPING = {
         'Developer Documentation': {'pattern': '%/documentations%', 'is_module': False, 'is_landing': True},
         'Pricing': {'pattern': '%/price%', 'is_module': False, 'is_landing': False},
         'Support': {'pattern': '%/support%', 'is_module': False, 'is_landing': False},
-        'Company Profile': {'pattern': '%/profile/company-profile%', 'is_module': False, 'is_landing': False},
-        'Team Invitation': {'pattern': '%/profile/team-access%', 'is_module': False, 'is_landing': False},
-        'Data Integration (API/Batch Upload)': {'pattern': '%/settings/data-integration%', 'is_module': True, 'is_landing': False},
-        'Monitoring Rules': {'pattern': '%/settings/monitoring-rules%', 'is_module': True, 'is_landing': False},
-        'Data Retention & Privacy': {'pattern': '%/settings/data-retention%', 'is_module': False, 'is_landing': False},
-        'Regulatory Reporting Setup': {'pattern': '%/settings/regulatory-setup%', 'is_module': False, 'is_landing': False},
-        'Alerts & Notifications': {'pattern': '%/settings/alerts%', 'is_module': False, 'is_landing': False},
-        'Screening Data Config': {'pattern': '%/settings/screening-config%', 'is_module': False, 'is_landing': False},
-        'Data Retention & Privacy': {'pattern': '%/settings/data-retention%', 'is_module': False, 'is_landing': False}
+        'Profile - Company Profile': {'pattern': '%/profile/company-profile%', 'is_module': False, 'is_landing': False},
+        'Profile - Team Invitation': {'pattern': '%/profile/team-access%', 'is_module': False, 'is_landing': False},
+        'Settings - Data Integration (API/Batch Upload)': {'pattern': '%/settings/data-integration%', 'is_module': True, 'is_landing': False},
+        'Settings - Monitoring Rules': {'pattern': '%/settings/monitoring-rules%', 'is_module': True, 'is_landing': False},
+        'Settings - Data Retention & Privacy': {'pattern': '%/settings/data-retention%', 'is_module': False, 'is_landing': False},
+        'Settings - Regulatory Reporting Setup': {'pattern': '%/settings/regulatory-setup%', 'is_module': False, 'is_landing': False},
+        'Settings - Alerts & Notifications': {'pattern': '%/settings/alerts%', 'is_module': False, 'is_landing': False},
+        'Settings - Screening Data Config': {'pattern': '%/settings/screening-config%', 'is_module': False, 'is_landing': False},
+        'Settings - Data Retention & Privacy': {'pattern': '%/settings/data-retention%', 'is_module': False, 'is_landing': False}
         },
 }
 

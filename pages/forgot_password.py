@@ -15,7 +15,7 @@ def show_forgot_page():
             
             # Icon and Header
             with ui.column().classes('w-full items-center mb-6'):
-                ui.icon('mail_lock').classes('text-5xl text-blue-600 mb-2')
+                ui.icon('mail_lock').classes('text-5xl text-indigo-600 mb-2')
                 ui.label('Reset Password').classes('text-2xl font-black text-slate-900 tracking-tight')
                 ui.label("Enter your email and we'll send you a temporary password.")\
                     .classes('text-slate-500 text-center text-sm mt-1')
@@ -32,8 +32,8 @@ def show_forgot_page():
                 ui.label('Temporary Password').classes('text-lg font-bold text-slate-900 mb-2')
                 ui.label('Use the temporary password below to log in, then change your password.')\
                     .classes('text-slate-500 text-center text-sm mb-4')
-                ui.label('A temporary Password has also been sent to your email.').classes('text-sm text-slate-600 mb-2')
-                temp_label = ui.label('').classes('text-2xl font-mono text-blue-600 bg-blue-500  px-4 py-2 rounded-lg mb-4')
+                ui.label('A temporary Password has also been generated for your account.').classes('text-sm text-slate-600 mb-2')
+                temp_label = ui.label('').classes('text-2xl font-mono text-indigo-600 bg-indigo-50 px-4 py-2 rounded-lg mb-4')
 
                 def copy_temp_password():
                     ui.run_javascript(f'navigator.clipboard.writeText("{temp_label.text}")')
@@ -45,7 +45,7 @@ def show_forgot_page():
                     dialog.close()
                     ui.navigate.to('/login')
 
-                ui.button('Close', on_click=close_and_redirect).props('elevated').classes('flex-1 bg-blue-600 text-white rounded-lg')
+                ui.button('Close', on_click=close_and_redirect).props('unelevated').classes('flex-1 bg-indigo-600 text-white rounded-lg').style('background: #4f46e5 !important; color: white !important;')
 
             #  Reset button
             def reset_click():
@@ -71,18 +71,22 @@ def show_forgot_page():
         
                 result = send_reset_email(email, temp_pswd)
 
-                if result and temp_pswd:
-                    ui.notify('A reset link has been sent to your email', color='green')
+                if temp_pswd:
+                    if result:
+                        ui.notify('A reset link has been sent to your email', color='green')
+                    else:
+                        ui.notify('Email failed to send, but a temporary password was generated', color='orange')
                     temp_label.set_text(temp_pswd)
                     dialog.open()
                 else:
-                    ui.notify('Email not found or failed to send email', color='red')
+                    ui.notify('Email not found or error occurred', color='red')
 
             # Primary Action Button
             ui.button('Send Reset Link', on_click=reset_click) \
-                .props('elevated') \
-                .classes('w-full py-3 bg-blue-600 text-white rounded-xl font-bold hover:scale-[1.01] transition-transform')
+                .props('unelevated') \
+                .classes('w-full py-3 rounded-xl font-bold hover:scale-[1.01] transition-transform shadow-lg shadow-indigo-200') \
+                .style('background: #4f46e5 !important; color: white !important;')
 
             # Back to Login: Subtle and centered
             with ui.row().classes('w-full justify-center mt-6 pt-4 border-t border-slate-100'):
-                ui.link('← Back to Login', '/login').classes('text-sm text-slate-500 hover:text-blue-600 font-medium no-underline')
+                ui.link('← Back to Login', '/login').classes('text-sm text-slate-500 hover:text-indigo-600 font-medium no-underline')

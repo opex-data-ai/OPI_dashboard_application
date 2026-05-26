@@ -16,8 +16,8 @@ def show_register_page():
             # --------------------
             # Header
             # --------------------
-            with ui.column().classes('w-full items-center mb-3 gap-1'):
-                ui.icon('person_add').classes('text-4xl text-blue-600')
+            with ui.column().classes('w-full items-center mb-6 gap-1'):
+                ui.icon('person_add').classes('text-4xl text-indigo-600')
                 ui.label('Create Account').classes(
                     'text-xl font-black text-slate-900 leading-tight'
                 )
@@ -185,21 +185,27 @@ def show_register_page():
                 ui.notify('Account created successfully!', color='green')
                 ui.navigate.to('/login')
 
+            # Bind Enter key to submit registration form
+            first_name_input.on('keydown.enter', register_click)
+            last_name_input.on('keydown.enter', register_click)
+            email_input.on('keydown.enter', register_click)
+            password_input.on('keydown.enter', register_click)
+            cpassword_input.on('keydown.enter', register_click)
+
             # --------------------
             # Register Button
             # --------------------
             ui.button(
                 'Get Started', on_click=register_click
-            ).props('elevated').classes(
-                'w-full py-2 mt-3 bg-blue-600 text-white '
-                'rounded-xl font-bold shadow-lg shadow-blue-100'
-            )
+            ).props('unelevated').classes(
+                'w-full py-2 mt-3 rounded-xl font-bold shadow-lg shadow-indigo-200'
+            ).style('background: #4f46e5 !important; color: white !important;')
 
             # --------------------
             # Footer
             # --------------------
             with ui.row().classes(
-                'w-full justify-center mt-0 pt-0 border-t border-slate-100'
+                'w-full justify-center mt-6 pt-4 border-t border-slate-100'
             ):
                 ui.label(
                     'Already have an account?'
@@ -209,5 +215,5 @@ def show_register_page():
                 ui.link(
                     'Sign in', '/login'
                 ).classes(
-                    'ml-1 text-xs text-blue-600 font-bold no-underline'
+                    'ml-1 text-xs text-indigo-600 font-bold no-underline hover:text-indigo-800'
                 )

@@ -74,7 +74,7 @@ async def show_product_home_page():
             # Header Section
             with ui.column().classes('w-full gap-2'):
                 #ui.label('Ecosystem Performance Overview').classes(ThemeManager.TYPOGRAPHY['h1'])
-                ui.label('Driving adoption, engagement, and cross-platform growth across our full suite of solutions.').classes(f'text-lg {ThemeManager.COLORS["text"]["secondary"]} max-w-xl')
+                ui.label('Driving adoption, engagement, and cross-platform growth across our full suite of solutions.').classes(f'text-md font-medium {ThemeManager.COLORS["text"]["primary"]} max-w-4xl')
             
             # Container that will be refreshed
             content_container = ui.column().classes('w-full gap-8')
@@ -150,7 +150,7 @@ async def show_product_home_page():
                                         if 'id' in stat:
                                             desc_data = METRIC_INFO.get(stat['id'])
                                             if desc_data:
-                                                with ui.button(icon='info_outline', color='slate-100').props('flat round size=sm').classes('opacity-60 hover:opacity-100 p-0'):
+                                                with ui.button(icon='info_outline').props('flat round size=sm').classes('text-slate-400 opacity-60 hover:opacity-100 p-0'):
                                                     with ui.menu().classes('p-4 max-w-xs shadow-2xl rounded-xl border border-slate-100'):
                                                         ui.label(desc_data['title']).classes('font-bold text-slate-900 mb-1')
                                                         ui.label(desc_data['description']).classes('text-sm text-slate-600 leading-normal')
@@ -174,7 +174,7 @@ async def show_product_home_page():
 
                             create_bar_chart(
                                 org_data, 
-                                'Platform Organization Breakdown',  
+                                'Organizations Count',  
                                 'platform', 
                                 ['total_orgs'],
                                 height='h-72',
@@ -192,7 +192,7 @@ async def show_product_home_page():
 
                             create_column_chart(
                                 user_data,
-                                'Platform User Breakdown', 
+                                'User Count', 
                                 'platform',
                                 ['total_users'],
                                 height='h-72',
@@ -384,10 +384,10 @@ async def show_product_home_page():
                 features = [
                     {'title': 'Real-time Analytics', 'icon': 'data_exploration', 'desc': 'Instant insights into your regulatory data.'},
                     {'title': 'AI-Powered Platform', 'icon': 'auto_awesome', 'desc': 'Anomaly detection and Conversational AI'},
-                    {'title': 'Secure & Private', 'icon': 'lock', 'desc': 'Enterprise-grade security and data encryption.'}
+                    {'title': 'Secure & Private', 'icon': 'lock', 'desc': 'Enterprise-grade security and encryption.'}
                 ]
                 for f in features:
-                    with ui.card().classes('flex-1 p-6 border border-slate-100 bg-slate-50 shadow-none rounded-xl'):
+                    with ui.card().classes('flex-1 p-6 border border-slate-100 shadow-none rounded-xl'):
                         with ui.row().classes('items-center gap-3 mb-2'):
                             ui.icon(f['icon']).classes('text-slate-600')
                             ui.label(f['title']).classes('font-bold text-slate-800')

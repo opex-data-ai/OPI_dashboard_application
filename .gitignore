@@ -117,3 +117,7 @@ inspect_db.py
 #settings
 .agent/
 .vscode/
+
+# Local workspace directories
+scratch/
+downloads/

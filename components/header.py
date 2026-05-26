@@ -22,7 +22,7 @@ def create_header(page_title: Optional[str] = None,
 
     
     
-    with ui.header().classes('bg-white border-b border-slate-200').style(f'height: 60px; padding: 0; position: fixed; top: 0; z-index: 999; transition: left 0.3s ease, width 0.3s ease;'): #left: {sidebar_width}; width: calc(100% - {sidebar_width})
+    with ui.header().classes('border-b border-slate-200').style(f'background: rgba(255,255,255,0.85); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); height: 60px; padding: 0; position: fixed; top: 0; z-index: 999; transition: left 0.3s ease, width 0.3s ease;'):
         with ui.row().classes('w-full h-full items-center justify-between px-6'):
             
                     
@@ -31,9 +31,9 @@ def create_header(page_title: Optional[str] = None,
                 if page_title or page_subtitle:
                     with ui.column().classes('w-full mb-1'):
                         if page_title:
-                            ui.label(page_title).classes('text-3xl font-bold text-slate-900 mb-2')
+                            ui.label(page_title).classes('ds-h2')
                         if page_subtitle:
-                            ui.label(page_subtitle).classes('text-slate-600')
+                            ui.label(page_subtitle).classes('ds-small')
                 #ui.image('/assets/img/epi_logo.png').classes('h-12 w-20 object-contain')
             
             # Right: Search, Notifications, User
@@ -52,7 +52,7 @@ def create_header(page_title: Optional[str] = None,
                         {'title': 'Tasks', 'path': '/dashboard/workforce/tasks', 'category': 'Workforce Intelligence', 'feature': 'project'},
                         {'title': 'Utilization', 'path': '/dashboard/workforce/utilization', 'category': 'Workforce Intelligence', 'feature': 'people'},
                         {'title': 'Staff Performance', 'path': '/dashboard/workforce/staff-performance', 'category': 'Workforce Intelligence', 'feature': 'people'},
-                        {'title': 'AI Insights', 'path': '/dashboard/ai-insights', 'category': 'Pages', 'feature': 'ai_insights'},
+                        {'title': 'AI Analyst', 'path': '/dashboard/ai-insights', 'category': 'Pages', 'feature': 'ai_insights'},
                         {'title': 'Reports', 'path': '/dashboard/reports', 'category': 'Pages', 'feature': 'reports'},
                         {'title': 'Settings', 'path': '/dashboard/settings', 'category': 'Pages', 'feature': 'settings'},
                     ]
@@ -174,7 +174,7 @@ def create_header(page_title: Optional[str] = None,
                 # User dropdown menu
                 with ui.button().props('flat').classes('gap-2'):
                     # Avatar with initials
-                    with ui.avatar().classes('bg-blue-600 text-white').props('size=sm'):
+                    with ui.avatar().classes('text-white').props('size=sm').style('background: linear-gradient(135deg, #6366f1, #8b5cf6);'):
                         ui.label(initials).classes('text-sm font-bold')
                     
                     # User info (hidden on mobile)
@@ -189,7 +189,7 @@ def create_header(page_title: Optional[str] = None,
                         with ui.column().classes('w-56 p-2'):
                             # User info section
                             with ui.row().classes('w-full p-3 border-b border-slate-200 gap-3'):
-                                with ui.avatar().classes('bg-blue-600 text-white'):
+                                with ui.avatar().classes('text-white').style('background: linear-gradient(135deg, #6366f1, #8b5cf6);'):
                                     ui.label(initials).classes('text-sm font-bold')
                                 with ui.column().classes('gap-0'):
                                     ui.label(f'{first_name} {last_name}').classes('text-sm font-semibold text-slate-900')

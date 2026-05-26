@@ -11,7 +11,7 @@ from data_engine.data_config import get_service_account_credentials, DRIVE_FOLDE
 
 logger = logging.getLogger(__name__)
 
-DRIVE_SCOPES = ['https://www.googleapis.com/auth/drive.readonly']
+DRIVE_SCOPES = ['https://www.googleapis.com/auth/drive']
 
 class DriveHandler:
     def __init__(self):
@@ -46,13 +46,27 @@ class DriveHandler:
             
         try:
             query = f"'{self.folder_id}' in parents and mimeType='text/csv' and trashed=false"
-            results = self.service.files().list(
-                q=query,
-                pageSize=100, 
-                fields="nextPageToken, files(id, name, createdTime)"
-            ).execute()
-            items = results.get('files', [])
-            return items
+            all_files = []
+            page_token = None
+            
+            while True:
+                results = self.service.files().list(
+                    q=query,
+                    pageSize=100, 
+                    fields="nextPageToken, files(id, name, createdTime)",
+                    supportsAllDrives=True,
+                    includeItemsFromAllDrives=True,
+                    pageToken=page_token
+                ).execute()
+                
+                items = results.get('files', [])
+                all_files.extend(items)
+                
+                page_token = results.get('nextPageToken')
+                if not page_token:
+                    break
+                    
+            return all_files
         except Exception as e:
             print(f"Error listing files from Drive: {e}")
             return []
@@ -73,7 +87,10 @@ class DriveHandler:
             
         try:
             print(f"Downloading {file_name} from Drive...")
-            request = self.service.files().get_media(fileId=file_id)
+            request = self.service.files().get_media(
+                fileId=file_id,
+                supportsAllDrives=True
+            )
             fh = io.BytesIO()
             downloader = MediaIoBaseDownload(fh, request)
             done = False
