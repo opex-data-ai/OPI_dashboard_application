@@ -660,12 +660,12 @@ def shutdown():
 
 # Render sets PORT dynamically; fall back to 8080 for local dev
 PORT = int(os.getenv('PORT', 8080))
-IS_PROD = os.getenv('RENDER', False)  # Render automatically sets RENDER=true
 
 ui.run(
     host='0.0.0.0',
     port=PORT,
     storage_secret=STORAGE_SECRET,
     favicon='assets/favicon.ico',
-    reload=not IS_PROD  # Disable hot-reload in production
+    reload=False,  # Must be False on Render — reload=True spawns a subprocess that holds the port
+    show=False,    # Don't attempt to open a browser on the server
 )
