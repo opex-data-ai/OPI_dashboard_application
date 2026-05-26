@@ -658,10 +658,14 @@ def shutdown():
     except Exception as e:
         print(f"Error during shutdown: {e}")
 
+# Render sets PORT dynamically; fall back to 8080 for local dev
+PORT = int(os.getenv('PORT', 8080))
+IS_PROD = os.getenv('RENDER', False)  # Render automatically sets RENDER=true
+
 ui.run(
     host='0.0.0.0',
-    port=8080,
+    port=PORT,
     storage_secret=STORAGE_SECRET,
     favicon='assets/favicon.ico',
-    reload=True
+    reload=not IS_PROD  # Disable hot-reload in production
 )
